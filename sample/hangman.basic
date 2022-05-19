@@ -1,0 +1,86 @@
+10    CALL  1000
+20    PRINT "=== HANGMAN ===~n"
+30    LET p = words
+40    LET l = p + 144
+50    LET d = l + 21
+60    LET n = d + 21
+70    LET u = n + 27
+80    FOR i IN 0 UNTIL 20; LET [d + i] = '-'; END
+90    FOR i IN 0 UNTIL 26; LET [n + i] = 0;   END
+100   FOR i IN 0 UNTIL 12; FOR j IN 0 UNTIL 12
+110     LET [p + i * 12 + j] = ' '
+120   END; END
+130   FOR i IN 0 UNTIL 12; LET [p + i * 12] = 'x'; END
+140   LET c = 1; LET z = 50
+150   IF c < n; GOTO 170; END
+160   PRINT "YOU DID ALL THE WORDS!!~n"; STOP
+170   LET q = RND(n) + 1
+180   IF [u + q] = 1; GOTO 100; END
+190   LET [u + q] = 1; LET C = C + 1; LET T = 0
+200   PRINT "HERE ARE THE LETTERS YOU USED:~n"
+210   PRINT "~s~n" [n]
+      STOP 
+
+REM    ASSIGN VALID WORDS IN MEMORY
+1000   LET words = 50
+1005   LET i = 0
+1010   LET [words] = "GUM"; CALL 1600
+1020   LET [words] = "SIN"; CALL 1600
+1030   LET [words] = "FOR"; CALL 1600
+1040   LET [words] = "CRY"; CALL 1600
+1050   LET [words] = "LUG"; CALL 1600
+1060   LET [words] = "BYE"; CALL 1600
+1070   LET [words] = "FLY"; CALL 1600
+1080   LET [words] = "UGLY"; CALL 1600
+1090   LET [words] = "EACH"; CALL 1600
+1100   LET [words] = "FROM"; CALL 1600
+1110   LET [words] = "WORK"; CALL 1600
+1120   LET [words] = "TALK"; CALL 1600
+1130   LET [words] = "WITH"; CALL 1600
+1140   LET [words] = "SELF"; CALL 1600
+1150   LET [words] = "PIZZA"; CALL 1600
+1160   LET [words] = "THING"; CALL 1600
+1170   LET [words] = "FEIGN"; CALL 1600
+1180   LET [words] = "FIEND"; CALL 1600
+1190   LET [words] = "ELBOW"; CALL 1600
+1200   LET [words] = "FAULT"; CALL 1600
+1210   LET [words] = "DIRTY"; CALL 1600
+1220   LET [words] = "BUDGET"; CALL 1600
+1230   LET [words] = "SPIRIT"; CALL 1600
+1240   LET [words] = "QUAINT"; CALL 1600
+1250   LET [words] = "MAIDEN"; CALL 1600
+1260   LET [words] = "ESCORT"; CALL 1600
+1270   LET [words] = "PICKAXE"; CALL 1600
+1280   LET [words] = "EXAMPLE"; CALL 1600
+1290   LET [words] = "TENSION"; CALL 1600
+1300   LET [words] = "QUININE"; CALL 1600
+1310   LET [words] = "KIDNEY"; CALL 1600
+1320   LET [words] = "REPLICA"; CALL 1600
+1330   LET [words] = "SLEEPER"; CALL 1600
+1340   LET [words] = "TRIANGLE"; CALL 1600
+1350   LET [words] = "KANGAROO"; CALL 1600
+1360   LET [words] = "MAHOGANY"; CALL 1600
+1370   LET [words] = "SERGEANT"; CALL 1600
+1380   LET [words] = "SEQUENCE"; CALL 1600
+1390   LET [words] = "MOUSTACHE"; CALL 1600
+1400   LET [words] = "DANGEROUS"; CALL 1600
+1410   LET [words] = "SCIENTIST"; CALL 1600
+1420   LET [words] = "DIFFERENT"; CALL 1600
+1430   LET [words] = "QUIESCENT"; CALL 1600
+1440   LET [words] = "MAGISTRATE"; CALL 1600
+1450   LET [words] = "ERRONEOUSLY"; CALL 1600
+1460   LET [words] = "LOUDSPEAKER"; CALL 1600
+1470   LET [words] = "PHYTOTOXIC"; CALL 1600
+1480   LET [words] = "MATRIMONIAL"; CALL 1600
+1490   LET [words] = "THIGMOTROPISM"; CALL 1600
+1500   LET [words] = "PARASYMPATHOMIMETIC"; CALL 1600
+1510   RETURN
+
+REM   END OF STRING
+1600    LET [i] = words
+1610    LET i = i + 1
+1620    LET words = words + 1
+1630    IF [words - 1]
+1640      GOTO 1620
+1650    END
+1660    RETURN

@@ -1,0 +1,12 @@
+0     LET pointer = 0
+10    PRINT "AMAZING PROGRAM~n~n~n~n"
+20    INPUT "WHAT IS YOUR WIDTH? " width
+30    INPUT "WHAT IS YOUR LENGTH? " height
+100   IF (width > 1) * (height > 1); GOTO 130; END
+110   PRINT "Invalid Dimensions~nTry Again~n"
+120   GOTO 20
+130   LET array = pointer; LET pointer = array + w * h
+140   PRINT "~n~n~n~n"
+150   LET q = 0; LET z = 0; LET x = RND(height) + 1
+160   PRINT "X is: ~u~n" x
+      STOP
