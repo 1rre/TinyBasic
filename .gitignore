@@ -1,0 +1,6 @@
+.metals/
+.vscode/
+build/
+default/
+out/
+**.old

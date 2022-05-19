@@ -1,0 +1,124 @@
+= μBasic Syntax
+
+== statements
+* statement
+* statement statements
+
+== statement
+* statement_number command
+* command
+
+== statement_number
+* number
+
+== value
+* relational_op
+
+== relational_op
+* relational_op {>} additive_op
+* relational_op {<} additive_op
+* relational_op {≤} additive_op
+* relational_op {≥} additive_op
+* relational_op {=} additive_op
+* relational_op {≠} additive_op
+* additive_op
+
+== additive_op
+* additive_op {+} multiplicative_op
+* additive_op {-} multiplicative_op
+* multiplicative_op
+
+== multiplicative_op
+* multiplicative_op {·} unary_op
+* multiplicative_op {/} unary_op
+* multiplicative_op {%} unary_op
+* unary_op
+
+== unary_op
+* {-} unary_op
+* {+} unary_op
+* memory
+* number
+* {(} value {)}
+
+== memory
+* variable
+* array_reference
+
+== variable
+* {a..z}
+* {A..Z}
+
+== array_reference
+* {[} value {]}
+
+== number
+* {0..32767}
+* {-32767..-1}
+
+== command
+* call_command
+* for_command
+* goto_command
+* if_command
+* input_command
+* let_command
+* list_command
+* note_command
+* print_command
+* return_command
+* run_command
+* stop_command
+* while_command
+* until_command
+
+== let_command
+* {LET} memory {=} value
+
+== print_command
+* {PRINT} formatter values
+
+== goto_command
+* {GOTO} statement_number
+
+== call_command
+* {CALL} statement_number
+
+== return_command
+* {RETURN}
+
+== if_command
+* {IF} value statements {END}
+* {IF} value statements goto_command
+* {IF} value statements return_command
+
+== input_command
+* {INPUT} memory
+* {INPUT} string memory
+
+== list_command
+* {LIST}
+* {LIST} statement_number
+* {LIST} statement_number statement_number
+
+== run_command
+* {RUN}
+* {RUN} statement_number
+
+== while_command
+* {WHILE} value statements {END}
+
+== until_command
+* {UNTIL} value statements {END}
+
+== for_command
+* {FOR} memory {IN} value {TO} value statements {END}
+* {FOR} memory {IN} value {UNTIL} value statements {END}
+* {FOR} memory {IN} value {TO} value {BY} value statements {END}
+* {FOR} memory {IN} value {UNTIL} value {BY} value statements {END}
+
+== stop_command
+* {STOP}
+
+== note_command
+* {NOTE}

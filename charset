@@ -1,0 +1,130 @@
+nn | MyArch Behaviour     | ASCII Behaviour
+-- | -------------------- | ---------------------
+00 | End of String        | Null
+01 |                      | Start of Heading
+02 |                      | Start of Text
+03 | Break                | End of Text
+04 | End of File          | End of Transmission
+05 |                      | Enquiry
+06 |                      | Acknowledge
+07 | Bell                 | Bell
+08 |                      | Backspace
+09 | Tab                  | Horizontal Tab
+0A | Newline              | Line Feed
+0B | Line Feed            | Vertical Tab
+0C | Clear All            | Form Feed
+0D | Carriage Return      | Carriage Return
+0E |                      | Shift Out
+0F |                      | Shift In
+10 |                      | Data Link Escape
+11 |                      | Device Control 1
+12 |                      | Device Control 2
+13 |                      | Device Control 3
+14 |                      | Device Control 4
+15 |                      | Negative Acknowledge
+16 |                      | Synchronous Idle
+17 |                      | End of Transmission Block
+18 | Delete Word          | Cancel
+19 |                      | End of Medium
+1A | Terminate Execution  | Substitute
+1B |                      | Escape
+1C | ·                    | File Separator
+1D | ≤                    | Group Separator
+1E | ≠                    | Record Separator
+1F | ≥                    | Unit Separator
+20 | Space                | Space
+21 | !                    | !
+22 | "                    | "
+23 | #                    | #
+24 | $                    | $
+25 | %                    | %
+26 | &                    | &
+27 | '                    | '
+28 | (                    | (
+29 | )                    | )
+2A | *                    | *
+2B | +                    | +
+2C | ,                    | ,
+2D | -                    | -
+2E | .                    | .
+2F | /                    | /
+30 | 0                    | 0
+31 | 1                    | 1
+32 | 2                    | 2
+33 | 3                    | 3
+34 | 4                    | 4
+35 | 5                    | 5
+36 | 6                    | 6
+37 | 7                    | 7
+38 | 8                    | 8
+39 | 9                    | 9
+3A | :                    | :
+3B | ;                    | ;
+3C | <                    | <
+3D | =                    | =
+3E | >                    | >
+3F | ?                    | ?
+40 | @                    | @
+41 | A                    | A
+42 | B                    | B
+43 | C                    | C
+44 | D                    | D
+45 | E                    | E
+46 | F                    | F
+47 | G                    | G
+48 | H                    | H
+49 | I                    | I
+4A | J                    | J
+4B | K                    | K
+4C | L                    | L
+4D | M                    | M
+4E | N                    | N
+4F | O                    | O
+50 | P                    | P
+51 | Q                    | Q
+52 | R                    | R
+53 | S                    | S
+54 | T                    | T
+55 | U                    | U
+56 | V                    | V
+57 | W                    | W
+58 | X                    | X
+59 | Y                    | Y
+5A | Z                    | Z
+5B | [                    | [
+5C | \                    | \
+5D | ]                    | ]
+5E | ^                    | ^
+5F | _                    | _
+60 | `                    | `
+61 | a                    | a
+62 | b                    | b
+63 | c                    | c
+64 | d                    | d
+65 | e                    | e
+66 | f                    | f
+67 | g                    | g
+68 | h                    | h
+69 | i                    | i
+6A | j                    | j
+6B | k                    | k
+6C | l                    | l
+6D | m                    | m
+6E | n                    | n
+6F | o                    | o
+70 | p                    | p
+71 | q                    | q
+72 | r                    | r
+73 | s                    | s
+74 | t                    | t
+75 | u                    | u
+76 | v                    | v
+77 | w                    | w
+78 | x                    | x
+79 | y                    | y
+7A | z                    | z
+7B | {                    | {
+7C | |                    | |
+7D | }                    | }
+7E | ~                    | ~
+7F | Delete Character     | Delete
