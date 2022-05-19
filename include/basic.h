@@ -63,12 +63,12 @@ typedef struct {
 } EndCommand;
 
 typedef struct {
-  /* No Contents */
-} RemCommand;
+  /* No Contents (for now) */
+} NoteCommand;
 
 typedef struct {
-  struct CommandDetails* contents;
-  UInt Size;
+  struct CommandDetails* Left;
+  struct CommandDetails* Right;
 } MultipleCommand;
 
 typedef struct {
@@ -90,28 +90,28 @@ typedef union {
   CallCommand Call;
   StopCommand Stop;
   EndCommand End;
-  RemCommand Rem;
+  NoteCommand Note;
   MultipleCommand Multiple;
   UncompiledCommand Uncompiled;
 } Command;
 
 typedef enum {
   id_null,
-  id_if,
-  id_while,
-  id_until,
-  id_for,
-  id_input,
-  id_list,
-  id_run,
-  id_return,
-  id_let,
-  id_goto,
   id_call,
-  id_stop,
   id_end,
-  id_rem,
-  id_multip
+  id_for,
+  id_goto,
+  id_if,
+  id_input,
+  id_let,
+  id_list,
+  id_multip,
+  id_note, /* Used over `REM` to simplify parsing */
+  id_return,
+  id_run,
+  id_stop,
+  id_until,
+  id_while
 } CommandId;
 
 typedef struct CommandDetails {

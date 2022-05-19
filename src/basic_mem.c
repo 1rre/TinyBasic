@@ -45,7 +45,7 @@ void free_command(CommandDetails cmd) {
     case id_end:
 
     return;
-    case id_rem:
+    case id_note:
 
     return;
     case id_multip:

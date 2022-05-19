@@ -56,16 +56,37 @@ StatementList insert_cmd(CommandToken cmd, StatementList s) {
   }
 }
 
-void run_command(CommandDetails* cmd, UInt* LineNum) {
+typedef enum {
+  rcode_stop,
+  rcode_continue,
+  rcode_return
+} RCode;
+
+RCode run_statements(StatementList);
+RCode run_command(CommandDetails*, UInt*);
+
+RCode run_statements(StatementList s) {
+  if (s) {
+    switch (run_command(&s->cmd.Details, &s->cmd.LineNum)) {
+      case rcode_stop: return rcode_stop;
+      case rcode_continue: return run_statements(s->next);
+      case rcode_return: return rcode_continue;
+    }
+  } else {
+    printf("Reached the end of control without stop.\n");
+    return rcode_stop;
+  }
+}
+
+RCode run_command(CommandDetails* cmd, UInt* LineNum) {
   switch (cmd->Id) {
     case id_null:
       CommandDetails* c = parse_command(cmd->Command.Uncompiled);
-      if (c->Id != id_null) run_command(c, LineNum);
-      else if (LineNum) printf(" On Line %u\n", LineNum);
+      if (c && c->Id != id_null) run_command(c, LineNum);
+      else if (LineNum) printf(" On Line %u\n", *LineNum);
       else printf("\n");
-      free_command(*c);
-      free(c);
-    return;
+      if (c) free_command(*c), free(c);
+    return rcode_stop;
     case id_if:
       notimpl("IF");
     case id_while:
@@ -79,27 +100,22 @@ void run_command(CommandDetails* cmd, UInt* LineNum) {
     case id_list:
       notimpl("LIST");
     case id_run:
-      notimpl("RUN");
-    case id_return:
-      notimpl("RETURN");
+      run_statements(statements);
     case id_let:
       notimpl("LET");
     case id_goto:
       notimpl("GOTO");
     case id_call:
       notimpl("CALL");
-    case id_stop:
-      notimpl("STOP");
     case id_end:
       notimpl("END");
-    case id_rem:
-      /* Do nothing */
-    return;
+    case id_return: return rcode_return;
+    case id_stop: return rcode_stop;
+    case id_note: return rcode_continue;
     case id_multip:
       MultipleCommand mc = cmd->Command.Multiple;
-      for (int i = 0; i < mc.Size; i++) {
-        run_command(mc.contents + i, LineNum);
-      }
+      run_command(mc.Left, LineNum);
+      run_command(mc.Right, LineNum);
       
     exit(1);
   }
@@ -126,6 +142,7 @@ void update_env(char* input, size_t size) {
 void run_interpreter() {
   /* TODO: Set read mode
   */
+  printf("READY\n");
 start:
   char* buf = 0;
   size_t size = 0;
