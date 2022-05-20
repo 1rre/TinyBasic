@@ -6,49 +6,49 @@ void free_value(ValueToken val) {
 
 void free_command(CommandDetails cmd) {
   switch (cmd.Id) {
-    case id_null:
+    case cmd_null:
       free(cmd.Command.Uncompiled.Contents);
     return;
-    case id_if:
+    case cmd_if:
       free_value(*cmd.Command.If.Predicate); return;
-    case id_while:
+    case cmd_while:
       free_value(*cmd.Command.While.Predicate); return;
-    case id_until:
+    case cmd_until:
       free_value(*cmd.Command.Until.Predicate); return;
-    case id_for:
+    case cmd_for:
 
     return;
-    case id_input:
+    case cmd_input:
 
     return;
-    case id_list:
+    case cmd_list:
 
     return;
-    case id_run:
+    case cmd_run:
 
     return;
-    case id_return:
+    case cmd_return:
 
     return;
-    case id_let:
+    case cmd_let:
 
     return;
-    case id_goto:
+    case cmd_goto:
 
     return;
-    case id_call:
+    case cmd_call:
 
     return;
-    case id_stop:
+    case cmd_stop:
 
     return;
-    case id_end:
+    case cmd_end:
 
     return;
-    case id_note:
+    case cmd_note:
 
     return;
-    case id_multip:
+    case cmd_multiple:
 
     return;
   }
