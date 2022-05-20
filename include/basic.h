@@ -1,12 +1,17 @@
 #ifndef header_basic
 #define header_basic
 #include <stdlib.h>
+#include <stdint.h>
+
+#ifdef _WIN32
+  #define strncasecmp(x,y,z) _strnicmp(x,y,z)
+#endif
 
 void notimpl(char*);
 
-typedef u_int32_t UInt;
+typedef uint32_t UInt;
 /* 2^32 - 2 */
-#define UINT_MAX ((UInt)4294967294u)
+#define MAX_LOCAL_INT ((UInt)4294967294u)
 
 
 typedef enum {
@@ -59,7 +64,7 @@ typedef struct {
 } FunCall;
 
 typedef struct {
-  u_int8_t name; /* a..z, A..Z */
+  uint8_t name; /* a..z, A..Z */
 } Register;
 
 typedef struct {
@@ -84,28 +89,25 @@ typedef enum {
 } ValueId;
 
 typedef struct {
-  ValueDetails Details;
+  ValueDetails* Details;
   ValueId Id;
 } ValueToken;
 
 typedef struct {
-
+    ValueToken Lo;
+    ValueToken Hi;
+    ValueToken Step;
 } ForCommand;
 
 typedef struct {
-
+    char* Prompt;
+    ValueToken to;
 } InputCommand;
 
-typedef struct {
-
-} RunCommand;
 
 typedef struct {
-
-} ReturnCommand;
-
-typedef struct {
-
+    ValueToken Memory;
+    ValueToken Value;
 } LetCommand;
 
 typedef struct {
@@ -123,6 +125,9 @@ typedef union {
   ValueToken* Value;
   UncompiledCommand* Uncompiled;
   MultipleCommand* Multiple;
+  InputCommand* Input;
+  LetCommand* Let;
+  ForCommand* For;
 } Command;
 
 typedef enum {

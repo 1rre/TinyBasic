@@ -1,9 +1,20 @@
 #define  _GNU_SOURCE
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include "basic.h"
 
 UInt variables[26], *memory = 0;
+
+#ifdef _WIN32
+int getline(char** buf, size_t* size, FILE* stream) {
+  *buf = (char*)malloc(120 * sizeof(char));
+  printf("Malloc'd %p\n", *buf);
+  fscanf(stream, "%[^\r\n]*\r?\n", *buf);
+  printf("Read %s\n", *buf);
+  *size = strlen(*buf);
+}
+#endif
 
 struct StatementNode {
   CommandToken cmd;
@@ -73,6 +84,16 @@ RCode run_statements(StatementList s) {
   }
 }
 
+RCode run_from(UInt i) {
+  StatementList s = statements;
+  while (s && s->cmd.LineNum < i) s = s->next;
+  if (s && s->cmd.LineNum == i) return run_statements(s);
+  else {
+    printf("? line %d undefined\n", i);
+    return rcode_stop;
+  }
+}
+
 RCode run_command(CommandDetails* cmd, UInt* LineNum) {
   CommandDetails* c;
   RCode rtn = rcode_stop;
@@ -87,34 +108,27 @@ RCode run_command(CommandDetails* cmd, UInt* LineNum) {
     return rtn;
     case cmd_if:
       notimpl("IF");
-    __attribute__ ((fallthrough));
     case cmd_while:
       notimpl("WHILE");
-    __attribute__ ((fallthrough));
     case cmd_until:
       notimpl("UNTIL");
-    __attribute__ ((fallthrough));
     case cmd_for:
       notimpl("FOR");
-    __attribute__ ((fallthrough));
     case cmd_input:
       notimpl("INPUT");
-    __attribute__ ((fallthrough));
     case cmd_list:
       notimpl("LIST");
-    __attribute__ ((fallthrough));
     case cmd_let:
       notimpl("LET");
-    __attribute__ ((fallthrough));
     case cmd_goto:
+      /* TODO: Next line <- goto...
+               Is it necessary to return "return" || stop here due to run_statements?
+      */
       notimpl("GOTO");
-    __attribute__ ((fallthrough));
     case cmd_call:
       notimpl("CALL");
-    __attribute__ ((fallthrough));
     case cmd_end:
       notimpl("END");
-    __attribute__ ((fallthrough));
     case cmd_run: return run_statements(statements);
     case cmd_return: return rcode_return;
     case cmd_stop: return rcode_stop;
@@ -173,6 +187,7 @@ start:
   buf = 0;
   size = 0;
   getline(&buf, &size, stdin);
+  printf("Read: %s\n", buf);
   r = update_env(buf, size);
   printf("Rcode: %d\n", r);
   switch (r) {

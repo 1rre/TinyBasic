@@ -24,13 +24,13 @@ ParseResult parse_linenum(char* input, size_t size) {
   if (size > 0 && is_digit(input[0]))
     rtn.value = calloc(1, sizeof(UInt));
   for (unsigned i = 0; i < size && is_digit(input[i]); i++) {
-    if (*(UInt*)rtn.value > (UINT_MAX/10)) {
+    if (*(UInt*)rtn.value > (MAX_LOCAL_INT/10)) {
       // Overflow
       exit(1);
     }
     UInt to_add = input[i] - '0';
     *(UInt*)rtn.value *= 10;
-    if (UINT_MAX - to_add < *(UInt*)rtn.value) {
+    if (MAX_LOCAL_INT - to_add < *(UInt*)rtn.value) {
       // Overflow
       exit(1);
     }
@@ -85,12 +85,12 @@ UInt at_end(UncompiledCommand* cmd) {
 UInt parse_number(ValueToken** rtn, UncompiledCommand* cmd) {
   UInt x = 0;
   while (cmd->Size && is_digit(*cmd->Contents)) {
-    if (x > (UINT_MAX/10)) {
+    if (x > (MAX_LOCAL_INT/10)) {
       printf("Overflow on %u\n", x);
       exit(1);
     }
     x *= 10;
-    if (UINT_MAX - *cmd->Contents - '0' < x) {
+    if (MAX_LOCAL_INT - *cmd->Contents - '0' < x) {
       printf("Overflow on %u\n", x);
       exit(1);
     }
@@ -99,7 +99,8 @@ UInt parse_number(ValueToken** rtn, UncompiledCommand* cmd) {
   }
   *rtn = (ValueToken*)malloc(sizeof(ValueToken));
   (*rtn)->Id = value_int;
-  (*rtn)->Details.IntLiteral = x;
+  (*rtn)->Details = (ValueDetails*)malloc(sizeof(ValueDetails));
+  (*rtn)->Details->IntLiteral = x;
   return 1;
 }
 
@@ -116,7 +117,7 @@ UInt parse_value(ValueToken** rtn,  UncompiledCommand* cmd) {
   if (is_digit(*cmd->Contents)) {
     if (parse_number(rtn, cmd)) {
       skip_whitespace(cmd);
-      if (negate) (*rtn)->Details.IntLiteral = -(*rtn)->Details.IntLiteral;
+      if (negate) (*rtn)->Details->IntLiteral = -(*rtn)->Details->IntLiteral;
       if (at_end(cmd)) return 1;
       notimpl("Operations");
     }
