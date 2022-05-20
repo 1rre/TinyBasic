@@ -89,28 +89,12 @@ typedef struct {
 } ValueToken;
 
 typedef struct {
-  ValueToken* Predicate;
-} IfCommand;
-
-typedef struct {
-  ValueToken* Predicate;
-} WhileCommand;
-
-typedef struct {
-  ValueToken* Predicate;
-} UntilCommand;
-
-typedef struct {
 
 } ForCommand;
 
 typedef struct {
 
 } InputCommand;
-
-typedef struct {
-
-} ListCommand;
 
 typedef struct {
 
@@ -125,26 +109,6 @@ typedef struct {
 } LetCommand;
 
 typedef struct {
-
-} GotoCommand;
-
-typedef struct {
-
-} CallCommand;
-
-typedef struct {
-
-} StopCommand;  
-
-typedef struct {
-
-} EndCommand;
-
-typedef struct {
-  /* No Contents (for now) */
-} NoteCommand;
-
-typedef struct {
   struct CommandDetails* Left;
   struct CommandDetails* Right;
 } MultipleCommand;
@@ -155,22 +119,10 @@ typedef struct {
 } UncompiledCommand;
 
 typedef union {
-  IfCommand If;
-  WhileCommand While;
-  UntilCommand Until;
-  ForCommand For;
-  InputCommand Input;
-  ListCommand List;
-  RunCommand Run;
-  ReturnCommand Return;
-  LetCommand Let;
-  GotoCommand Goto;
-  CallCommand Call;
-  StopCommand Stop;
-  EndCommand End;
-  NoteCommand Note;
-  MultipleCommand Multiple;
-  UncompiledCommand Uncompiled;
+  /* Call, Goto, If, Run, Until, While */
+  ValueToken* Value;
+  UncompiledCommand* Uncompiled;
+  MultipleCommand* Multiple;
 } Command;
 
 typedef enum {
@@ -183,6 +135,7 @@ typedef enum {
   cmd_input,
   cmd_let,
   cmd_list,
+  cmd_print,
   cmd_multiple,
   cmd_note, /* Used over `REM` to simplify parsing */
   cmd_return,
@@ -199,7 +152,7 @@ typedef struct CommandDetails {
 
 typedef struct {
   UInt LineNum;
-  CommandDetails Details;
+  CommandDetails* Details;
 } CommandToken;
 
 typedef struct {
@@ -208,8 +161,8 @@ typedef struct {
 } ParseResult;
 
 void run_interpreter(void);
-void free_command(CommandDetails);
-void free_value(ValueToken);
+void free_command(CommandDetails*);
+void free_value(ValueToken*);
 
 CommandDetails* parse_command(UncompiledCommand);
 
