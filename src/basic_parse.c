@@ -139,8 +139,8 @@ UInt parse_value(ValueToken** rtn,  UncompiledCommand* cmd) {
 
 CommandDetails* parse_command_ptr(UncompiledCommand* cmd) {
   // ???
-  printf("Parsing %s\n", cmd->Contents);
   skip_whitespace(cmd);
+  if (at_end(cmd)) return 0;
   CommandId token = get_token(cmd);
   skip_whitespace(cmd);
   CommandDetails* rtn = 0;
@@ -173,7 +173,6 @@ CommandDetails* parse_command_ptr(UncompiledCommand* cmd) {
     /* Multiple should not be possible here */
     default: exit(1);
   }
-  printf("Remaining: %s\n", cmd->Contents);
   if (!at_end(cmd)) {
     free_command(rtn);
     printf("? Junk at end of line");
@@ -181,7 +180,6 @@ CommandDetails* parse_command_ptr(UncompiledCommand* cmd) {
   }
   rtn->Id = token;
   if (cmd->Size && *cmd->Contents == ';') {
-    printf("Is multiple.\n");
     cmd->Size--, cmd->Contents++;
     CommandDetails* right = parse_command_ptr(cmd);
     if (right) {

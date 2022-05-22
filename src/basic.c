@@ -4,15 +4,18 @@
 #include <string.h>
 #include "basic.h"
 
-UInt variables[26], *memory = 0;
+UInt variables[26];
+
+union {
+  UInt* UInt;
+  char* String;
+} memory = {0};
 
 #ifdef _WIN32
-int getline(char** buf, size_t* size, FILE* stream) {
-  *buf = (char*)malloc(120 * sizeof(char));
-  printf("Malloc'd %p\n", *buf);
-  fscanf(stream, "%[^\r\n]*\r?\n", *buf);
-  printf("Read %s\n", *buf);
-  *size = strlen(*buf);
+size_t getline(char** buf, size_t* size, FILE* stream) {
+  *buf = (char*)calloc(120, sizeof(char));
+  scanf("%s\n", *buf);
+  return strlen(*buf);
 }
 #endif
 
@@ -84,14 +87,61 @@ RCode run_statements(StatementList s) {
   }
 }
 
-RCode run_from(UInt i) {
+StatementList get_statement(UInt i) {
   StatementList s = statements;
   while (s && s->cmd.LineNum < i) s = s->next;
-  if (s && s->cmd.LineNum == i) return run_statements(s);
+  if (s && s->cmd.LineNum == i) return s;
+  else return 0;
+}
+
+RCode run_from(UInt i) {
+  StatementList s = get_statement(i);
+  if (s) return run_statements(s);
   else {
     printf("? line %d undefined\n", i);
     return rcode_stop;
   }
+}
+
+typedef union {
+  char* String;
+  UInt Int;
+} ResolvedValue;
+
+ResolvedValue resolveValue(ValueToken* value) {
+  ResolvedValue rtn;
+  if (!value) exit(1); // Error?
+  switch (value->Id) {
+    case value_null: // Error?
+      exit(1);
+    case value_register:
+      rtn.Int = variables[value->Details->Register.name];
+    break;
+    case value_memory:
+      rtn = resolveValue(
+        (ValueToken*)value->Details->Memory.Reference
+      );
+    break;
+    case value_int:
+      rtn.Int = value->Details->IntLiteral;
+    break;
+    case value_string:
+      rtn.String = "";
+      notimpl("String");
+    break;
+  }
+  return rtn;
+}
+
+RCode run_list(CommandDetails* cmd) {
+  if (!cmd) {
+    printf("? command null\n");
+    return rcode_stop;
+  }
+  UInt line = resolveValue(cmd->Command.Value).Int;
+  StatementList s = get_statement(line);
+  printf("%s\n", s->cmd.Details->Command.Uncompiled->Contents);
+  return rcode_continue;
 }
 
 RCode run_command(CommandDetails* cmd, UInt* LineNum) {
@@ -100,10 +150,9 @@ RCode run_command(CommandDetails* cmd, UInt* LineNum) {
   switch (cmd->Id) {
     case cmd_null:
       c = parse_command(*cmd->Command.Uncompiled);
-      printf("Got command code: %d\n", c->Id);
       if (c && c->Id != cmd_null) rtn = run_command(c, LineNum);
       else if (LineNum) printf(" On Line %u\n", *LineNum);
-      else printf("\n");
+      else if (cmd->Command.Uncompiled->Contents[0] != '\n') printf("\n");
       if (c) free_command(c);
     return rtn;
     case cmd_if:
@@ -117,7 +166,7 @@ RCode run_command(CommandDetails* cmd, UInt* LineNum) {
     case cmd_input:
       notimpl("INPUT");
     case cmd_list:
-      notimpl("LIST");
+      return run_list(cmd);
     case cmd_let:
       notimpl("LET");
     case cmd_goto:
@@ -155,7 +204,6 @@ RCode update_env(char* input, size_t size) {
   UncompiledCommand* uCmd =
     (UncompiledCommand*)malloc(sizeof(UncompiledCommand));
   if (ln.value) {
-    printf("Parse Line %u\n", *(UInt*)ln.value);
     uCmd->Contents = input, uCmd->Size = size - (ln.position - input);
     cmd.Details->Command.Uncompiled = uCmd;
     cmd.Details->Id = cmd_null;
@@ -164,15 +212,13 @@ RCode update_env(char* input, size_t size) {
     statements = insert_cmd(cmd, statements);
     return rcode_continue;
   } else {
-    printf("No line given.\n");
     uCmd->Contents = input;
     uCmd->Size = size;
     cmd.Details->Command.Uncompiled = uCmd;
     cmd.Details->Id = cmd_null;
-    RCode rtn = run_command(cmd.Details, 0);
+    run_command(cmd.Details, 0);
     free_command(cmd.Details);
-    printf("Returning %d\n", rtn);
-    return rtn;
+    return rcode_return;
   }
 }
 
@@ -187,15 +233,12 @@ start:
   buf = 0;
   size = 0;
   getline(&buf, &size, stdin);
-  printf("Read: %s\n", buf);
   r = update_env(buf, size);
-  printf("Rcode: %d\n", r);
   switch (r) {
     case rcode_continue:
-      printf("Continue\n");
       goto start;
     case rcode_return:
-      printf("Return with no stop\n");
+      printf("READY\n");
       goto start;
     case rcode_stop:
       printf("Goodbye\n");

@@ -25,19 +25,12 @@ void free_value(ValueToken* val) {
 }
 
 void free_command(CommandDetails* cmd) {
-  printf("Free: %p\n", cmd);
   if (!cmd) return;
   switch (cmd->Id) {
     case cmd_null:
-      printf("Free Null\n");
       if (cmd->Command.Uncompiled) {
-        if (cmd->Command.Uncompiled->Contents) {
-          printf("Free Contents: %s (%p)\n", cmd->Command.Uncompiled->Contents);
-          free(cmd->Command.Uncompiled->Contents);
-          printf("Free'd 1\n");
-        }
+        free(cmd->Command.Uncompiled->Contents);
         free(cmd->Command.Uncompiled);
-        printf("Free'd 2\n");
       }
     break;
     case cmd_list: case cmd_goto: case cmd_call:
