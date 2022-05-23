@@ -172,8 +172,8 @@ UInt parse_binop (
     while (pick_symbol(&active, symbols, n_symbols, rtn)) {
       ValueToken left = *(ValueToken*)rtn->Value;
       ValueToken right;
-      rtn->Cmd.Contents++;
-      rtn->Cmd.Size--;
+      rtn->Cmd.Contents += strlen(active.Symbol);
+      rtn->Cmd.Size -= strlen(active.Symbol);
       if (!try_next_op(rtn)) {
         /* Beyond here, it is a known syntax error *
          * As we have passed the op symbol         */
@@ -533,6 +533,7 @@ UInt parse_multiple(ParseResult* rtn) {
     skip_whitespace(&rtn->Cmd);
     if (!(
       parse_call(rtn) ||
+      parse_end(rtn) ||
       parse_for(rtn) ||
       parse_goto(rtn) ||
       parse_if(rtn) ||

@@ -71,20 +71,20 @@ typedef enum {
 } RCode;
 
 RCode run_statements(StatementList);
-RCode run_command(CommandDetails*, UInt*);
+RCode run_command(StatementList*, CommandDetails*);
 
 RCode run_statements(StatementList s) {
   if (s) {
-    switch (run_command(&s->cmd.Details, &s->cmd.LineNum)) {
+    switch (run_command(&s, &s->cmd.Details)) {
       case rcode_stop:
         return rcode_stop;
       case rcode_continue:
-        return run_statements(s->next);
-      case rcode_return:
-        return rcode_continue;
-      case rcode_end:
-        printf("? Unexpected END");
+        if (s) return run_statements(s->next);
+        printf("? Undefined statement\n");
         return rcode_stop;
+      /* These should both work the same */
+      case rcode_return: case rcode_end:
+        return rcode_continue;
       default: exit(1);
     }
   } else {
@@ -142,10 +142,12 @@ ResolvedValue do_binop(BinOp value) {
         rtn.Type = NullT;
         return rtn;
       }
+      rtn.Type = IntT;
       rtn.Value.Int = left.Value.Int + right.Value.Int;
     return rtn;
     case op_sub:
       /* TODO: Detect underflow */
+      rtn.Type = IntT;
       rtn.Value.Int = left.Value.Int - right.Value.Int;
     return rtn;
     case op_mul:
@@ -154,7 +156,16 @@ ResolvedValue do_binop(BinOp value) {
         rtn.Type = NullT;
         return rtn;
       }
+      rtn.Type = IntT;
       rtn.Value.Int = left.Value.Int * right.Value.Int;
+    return rtn;
+    case op_eqs:
+      rtn.Type = IntT;
+      rtn.Value.Int = left.Value.Int == right.Value.Int;
+    return rtn;
+    case op_neq:
+      rtn.Type = IntT;
+      rtn.Value.Int = left.Value.Int != right.Value.Int;
     return rtn;
     default:
       printf("Code is %d\n", value.Op);
@@ -284,18 +295,73 @@ RCode run_let(CommandDetails* cmd) {
   }
 }
 
-RCode run_command(CommandDetails* cmd, UInt* LineNum) {
+void update_uc(int* uc, CommandDetails deets) {
+
+  ParseResult p;
+  p.Value = 0;
+  switch (deets.Id) {
+    case cmd_multiple:
+      notimpl("Multiple when searching for end");
+    return;
+    case cmd_if: case cmd_for: case cmd_while: case cmd_until:
+      (*uc)++;
+    return;
+    case cmd_end:
+      (*uc)--;
+    return;
+    case cmd_null:
+      p.Cmd = *deets.Command.Uncompiled;
+      if (parse_line(&p)) {
+        update_uc(uc, *(CommandDetails*)p.Value);
+        free_command(*(CommandDetails*)p.Value);
+        free(p.Value);
+      }
+    return;
+    default:
+    return;
+  }
+}
+
+RCode run_to_end(StatementList s, CommandDetails* cmd) {
+  if (s->cmd.Details.Id == cmd_multiple) {
+    notimpl("If in Multiple commands");
+  }
+  return run_statements(s->next);
+}
+
+UInt find_next_end(StatementList* sl, int uc) {
+  if (!(*sl)) return 0;
+  update_uc(&uc, (*sl)->cmd.Details);
+  if (uc == 0) return 1;
+  *sl = (*sl)->next;
+  return find_next_end(sl, uc);
+}
+
+RCode predicate_inner(StatementList* sl, CommandDetails* cmd) {
+  ResolvedValue rv;
+  rv = resolveValue(cmd->Command.Value);
+  if (rv.Type != IntT) {
+    printf("? non-int value for block\n");
+    return rcode_stop;
+  }
+  if (rv.Value.Int) {
+    return rcode_continue;
+  } else return rcode_end;
+}
+
+RCode run_command(StatementList* sl, CommandDetails* cmd) {
   ParseResult p;
   p.Value = 0;
   RCode rtn = rcode_stop;
   ResolvedValue rv;
+  StatementList s;
 
   switch (cmd->Id) {
     case cmd_null:
       p.Cmd = *cmd->Command.Uncompiled;
       if (parse_line(&p))
-        rtn = run_command((CommandDetails*)p.Value, LineNum);
-      else if (LineNum) printf(" On Line %u\n", *LineNum);
+        rtn = run_command(sl, (CommandDetails*)p.Value);
+      else if (sl) printf(" On Line %u\n", (*sl)->cmd.LineNum);
       else if (cmd->Command.Uncompiled->Contents[0] != '\n') printf("\n");
       if (p.Value) {
         free_command(*(CommandDetails*)p.Value);
@@ -303,9 +369,32 @@ RCode run_command(CommandDetails* cmd, UInt* LineNum) {
       }
     return rtn;
     case cmd_if:
-      notimpl("IF");
+      s = *sl;
+      if (!find_next_end(sl, 0)) {
+        printf("? no end for block\n");
+        return rcode_stop;
+      }
+      switch (predicate_inner(sl, cmd)) {
+        case rcode_continue: return run_to_end(s, cmd);
+        case rcode_stop: return rcode_stop;
+        case rcode_end: return rcode_continue;
+        default: return rcode_kill;
+      }
     case cmd_while:
-      notimpl("WHILE");
+      s = *sl;
+      if (!find_next_end(sl, 0)) {
+        printf("? no end for block\n");
+        return rcode_stop;
+      }
+      while_start:
+      switch (predicate_inner(sl, cmd)) {
+        case rcode_continue:
+          run_to_end(s, cmd);
+          goto while_start;
+        case rcode_stop: return rcode_stop;
+        case rcode_end: return rcode_continue;
+        default: return rcode_kill;
+      }
     case cmd_until:
       notimpl("UNTIL");
     case cmd_for:
@@ -339,16 +428,16 @@ RCode run_command(CommandDetails* cmd, UInt* LineNum) {
     case cmd_note: return rcode_continue;
     case cmd_multiple:
     /* TODO: Ensure support for if; ...; end in one line */
-      switch (run_command(&cmd->Command.Multiple->Left, LineNum)) {
+      switch (run_command(sl, &cmd->Command.Multiple->Left)) {
       case rcode_continue:
-        return run_command(&cmd->Command.Multiple->Right, LineNum);
+        return run_command(sl, &cmd->Command.Multiple->Right);
       case rcode_return: return rcode_continue;
       case rcode_end: return rcode_end;
       case rcode_stop: return rcode_stop;
       case rcode_kill: return rcode_kill;
       }
     default:
-      printf("Unrecognised Command On Line %u!\n", *LineNum);
+      printf("Unrecognised Command On Line %u!\n", (*sl)->cmd.LineNum);
     exit(1);
   }
 }
@@ -384,7 +473,7 @@ RCode update_env(char* input, size_t size) {
   RCode r;
   cmd.Details.Id = cmd_null;
   cmd.Details.Command.Uncompiled = &uCmd;
-  r = run_command(&cmd.Details, 0);
+  r = run_command(0, &cmd.Details);
   free(input);
   if (r != rcode_kill) return rcode_return;
   else return r;
