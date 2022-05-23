@@ -108,8 +108,8 @@ typedef struct {
 
 
 typedef struct {
-    ValueToken Memory;
-    ValueToken Value;
+    ValueToken* Memory;
+    ValueToken* Value;
 } LetCommand;
 
 typedef struct {

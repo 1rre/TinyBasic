@@ -225,36 +225,60 @@ RCode set_register(Register r, ValueToken* t) {
   return rcode_continue;
 }
 
-RCode set_memory(Memory m, ValueToken* t) {
-  ResolvedValue rv = resolveValue(t);
+RCode set_memory_int(Memory m, UInt v) {
   ResolvedValue loc = resolveValue((ValueToken*)m.Reference);
   if (loc.Type != IntT) {
     printf("? set[]: non-int value\n");
     return rcode_stop;
   }
-  if (rv.Type == IntT) {
-    if (mem_size <= loc.Value.Int) {
-      memory.UInt = (UInt*)realloc(memory.UInt, loc.Value.Int * sizeof(UInt));
-      mem_size = loc.Value.Int - 1;
-    }
-    memory.UInt[loc.Value.Int] = rv.Value.Int;
-  } else if (rv.Type == StringT) {
-    notimpl("String");
+  if (mem_size <= loc.Value.Int) {
+    memory.UInt = (UInt*)realloc(memory.UInt, loc.Value.Int * sizeof(UInt));
+    mem_size = loc.Value.Int - 1;
   }
+}
+
+RCode set_memory(Memory m, ValueToken* t) {
+  ResolvedValue rv = resolveValue(t);
+  if (rv.Type == IntT) set_memory_int(m, rv.Value.Int);
+  ResolvedValue loc = resolveValue((ValueToken*)m.Reference);
+  if (loc.Type != IntT) {
+    printf("? set[]: non-int value\n");
+    return rcode_stop;
+  }
+  notimpl("String");
   return rcode_continue;
 }
 
+RCode run_input(CommandDetails* cmd) {
+  printf("%s", cmd->Command.Input->Prompt);
+  char* x;
+  size_t size;
+  getline(&x, &size, stdin);
+  UInt v = atoi(x);
+  free(x);
+  switch (cmd->Command.Input->to.Id) {
+    case value_register:
+      variables[cmd->Command.Input->to.Details->Register.name] = v;
+    return rcode_continue;
+    case value_memory:
+      return set_memory_int(cmd->Command.Input->to.Details->Memory, v);
+    default:
+      printf("? non-settable memory");
+      return rcode_stop;
+  }
+}
+
 RCode run_let(CommandDetails* cmd) {
-  switch (cmd->Command.Let->Memory.Id) {
+  switch (cmd->Command.Let->Memory->Id) {
     case value_register:
       return set_register(
-        cmd->Command.Let->Memory.Details->Register,
-        &cmd->Command.Let->Value
+        cmd->Command.Let->Memory->Details->Register,
+        cmd->Command.Let->Value
       );
     case value_memory:
       return set_memory(
-        cmd->Command.Let->Memory.Details->Memory,
-        &cmd->Command.Let->Value
+        cmd->Command.Let->Memory->Details->Memory,
+        cmd->Command.Let->Value
       );
     default:
       printf("? non-settable memory");
@@ -286,7 +310,7 @@ RCode run_command(CommandDetails* cmd, UInt* LineNum) {
     case cmd_for:
       notimpl("FOR");
     case cmd_input:
-      notimpl("INPUT");
+      return run_input(cmd);
     case cmd_list:
       return run_list(cmd);
     case cmd_let:
@@ -368,6 +392,12 @@ RCode update_env(char* input, size_t size) {
   else return r;
 }
 
+void list_registers() {
+  for (int i = 0; i < 26; i++) {
+    printf("Reg %c: %u\n", i + 'a', variables[i]);
+  }
+}
+
 void run_interpreter() {
   /* TODO: Set read mode
   */
@@ -395,4 +425,6 @@ start:
 
   }
   free_all_statements();
+  list_registers();
+  free(memory.UInt);
 }

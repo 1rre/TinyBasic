@@ -54,7 +54,9 @@ void free_command(CommandDetails* cmd) {
       notimpl("Free Input");
     break;
     case cmd_let:
-      notimpl("Free Let");
+      free_value(cmd->Command.Let->Memory);
+      free_value(cmd->Command.Let->Value);
+      free(cmd->Command.Let);
     break;
     case cmd_print:
       notimpl("Free Print");

@@ -20,6 +20,10 @@ UInt is_digit(char c) {
   return c >= '0' && c <= '9';
 }
 
+UInt is_letter(char c) {
+  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'z');
+}
+
 UInt is_end_char(char c) {
   return c == '\0' || c == '\n' || c == '\r';
 }
@@ -80,7 +84,20 @@ UInt parse_unsigned(ParseResult* rtn) {
 
 UInt parse_register(ParseResult* rtn) {
   WITH_FAILURE (
-    
+    skip_whitespace(&rtn->Cmd);
+    if (!rtn->Cmd.Size || !is_letter(rtn->Cmd.Contents[0])) FAIL();
+    rtn->Value = malloc(sizeof(ValueToken));
+    ((ValueToken*)rtn->Value)->Id = value_register;
+    ((ValueToken*)rtn->Value)->Details =
+      (ValueDetails*)malloc(sizeof(ValueDetails));
+    ((ValueToken*)rtn->Value)->Details->Register.name =
+      (rtn->Cmd.Contents[0] | 32) - 'a';
+    while (rtn->Cmd.Size && is_letter(rtn->Cmd.Contents[0])) {
+      rtn->Cmd.Contents++;
+      rtn->Cmd.Size--;
+    }
+    skip_whitespace(&rtn->Cmd);
+    return 1;
   )
 }
 
@@ -159,7 +176,7 @@ UInt parse_non_op(ParseResult* rtn) {
     ((ValueToken*)rtn->Value)->Details->IntLiteral = u;
     return 1;
   }
-  return parse_bracketed(rtn) || parse_memory(rtn);
+  return parse_memory(rtn) || parse_bracketed(rtn);
 }
 
 /* Operators ·, / & % */
@@ -301,12 +318,36 @@ UInt parse_input(ParseResult* rtn) {
   )
 }
 UInt parse_let(ParseResult* rtn) {
+  ValueToken* memory,* value;
   WITH_FAILURE (
     if (!check_ident("let", rtn)) FAIL();
     /*
       Let takes the form:
       LET {MEMORY} = {VALUE}
     */
+    skip_whitespace(&rtn->Cmd);
+    if (!parse_memory(rtn)) FAIL();
+    memory = (ValueToken*)rtn->Value;
+    skip_whitespace(&rtn->Cmd);
+    if (!rtn->Cmd.Size || rtn->Cmd.Contents[0] != '=') {
+      free_value(memory);
+      FAIL();
+    }
+    rtn->Cmd.Contents++;
+    rtn->Cmd.Size--;
+    skip_whitespace(&rtn->Cmd);
+    if (!parse_value(rtn)) {
+      free_value(memory);
+      FAIL();
+    }
+    value = (ValueToken*)rtn->Value;
+    rtn->Value = malloc(sizeof(CommandDetails));
+    ((CommandDetails*)rtn->Value)->Id = cmd_let;
+    ((CommandDetails*)rtn->Value)->Command.Let =
+      (LetCommand*)malloc(sizeof(LetCommand));
+    ((CommandDetails*)rtn->Value)->Command.Let->Memory = memory;
+    ((CommandDetails*)rtn->Value)->Command.Let->Value = value;
+    return 1;
   )
 }
 UInt parse_list(ParseResult* rtn) {
@@ -472,6 +513,7 @@ UInt parse_multiple(ParseResult* rtn) {
     continue;
     failure:
     *rtn = backup;
+    printf("? syntax error");
     return 0;
   } while (rtn->Cmd.Size && rtn->Cmd.Contents[0] == ';' && skip_sc(rtn));
   return 1;
