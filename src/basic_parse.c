@@ -66,14 +66,13 @@ UInt parse_raw_string(ParseResult* rtn) {
     ((ValueToken*)rtn->Value)->Details.String =
       (char*)malloc((i + 1) * sizeof(char));
     strncpy(
-      ((ValueToken*)rtn->Value)->Details.String COMMA
+      ((ValueToken*)rtn->Value)->Details.String,
       start,
       i
     );
     ((ValueToken*)rtn->Value)->Details.String[i] = 0;
     return 1;
   )
-
 }
 
 UInt parse_bracketed(ParseResult* rtn) {

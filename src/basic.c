@@ -396,7 +396,21 @@ RCode run_command(StatementList* sl, CommandDetails* cmd) {
         default: return rcode_kill;
       }
     case cmd_until:
-      notimpl("UNTIL");
+      s = *sl;
+      if (!find_next_end(sl, 0)) {
+        printf("? no end for block\n");
+        return rcode_stop;
+      }
+      until_start:
+      switch (predicate_inner(sl, cmd)) {
+        /* invert for until */
+        case rcode_end:
+          run_to_end(s, cmd);
+          goto until_start;
+        case rcode_stop: return rcode_stop;
+        case rcode_continue: return rcode_continue;
+        default: return rcode_kill;
+      }
     case cmd_for:
       notimpl("FOR");
     case cmd_input:
