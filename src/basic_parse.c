@@ -3,6 +3,8 @@
 #include <string.h>
 #include "basic.h"
 
+#define COMMA ,
+
 #define WITH_FAILURE(x)     \
 ParseResult backup = *rtn;  \
 x                           \
@@ -40,6 +42,37 @@ UInt assert_at_end(ParseResult* rtn) {
 }
 
 UInt parse_value(ParseResult*);
+
+UInt parse_raw_string(ParseResult* rtn) {
+  char* start;
+  int i = 0;
+  WITH_FAILURE (
+    skip_whitespace(&rtn->Cmd);
+    if (!rtn->Cmd.Size) FAIL();
+    if (rtn->Cmd.Contents[0] != '"') FAIL();
+    rtn->Cmd.Contents++;
+    rtn->Cmd.Size--;
+    start = rtn->Cmd.Contents;
+    while (rtn->Cmd.Size && rtn->Cmd.Contents[0] != '"') {
+      i++;
+      rtn->Cmd.Contents++;
+      rtn->Cmd.Size--;
+    }
+    if (!rtn->Cmd.Size || rtn->Cmd.Contents[0] != '"') FAIL();
+    rtn->Value = malloc(sizeof(ValueToken));
+    ((ValueToken*)rtn->Value)->Id = value_string;
+    ((ValueToken*)rtn->Value)->Details.String =
+      (char*)malloc((i + 1) * sizeof(char));
+    strncpy(
+      ((ValueToken*)rtn->Value)->Details.String COMMA
+      start,
+      i
+    );
+    ((ValueToken*)rtn->Value)->Details.String[i] = 0;
+    return 1;
+  )
+
+}
 
 UInt parse_bracketed(ParseResult* rtn) {
   WITH_FAILURE (
@@ -88,9 +121,7 @@ UInt parse_register(ParseResult* rtn) {
     if (!rtn->Cmd.Size || !is_letter(rtn->Cmd.Contents[0])) FAIL();
     rtn->Value = malloc(sizeof(ValueToken));
     ((ValueToken*)rtn->Value)->Id = value_register;
-    ((ValueToken*)rtn->Value)->Details =
-      (ValueDetails*)malloc(sizeof(ValueDetails));
-    ((ValueToken*)rtn->Value)->Details->Register.name =
+    ((ValueToken*)rtn->Value)->Details.Register =
       (rtn->Cmd.Contents[0] | 32) - 'a';
     while (rtn->Cmd.Size && is_letter(rtn->Cmd.Contents[0])) {
       rtn->Cmd.Contents++;
@@ -138,24 +169,23 @@ UInt parse_binop (
     if (!try_next_op(rtn)) FAIL();
     skip_whitespace(&rtn->Cmd);
     while (pick_symbol(&active, symbols, n_symbols, rtn)) {
-      struct ValueToken* left = (struct ValueToken*)rtn->Value;
-      struct ValueToken* right;
+      ValueToken left = *(ValueToken*)rtn->Value;
+      ValueToken right;
       rtn->Cmd.Contents++;
       rtn->Cmd.Size--;
       if (!try_next_op(rtn)) {
         /* Beyond here, it is a known syntax error *
          * As we have passed the op symbol         */
-        free_value((ValueToken*)left);
+        free_value(left);
         FAIL();
       }
-      right = (struct ValueToken*)rtn->Value;
+      right = *(ValueToken*)rtn->Value;
       rtn->Value = malloc(sizeof(ValueToken));
       ((ValueToken*)rtn->Value)->Id = value_binop;
-      ((ValueToken*)rtn->Value)->Details =
-        (ValueDetails*)malloc(sizeof(ValueDetails));
-      ((ValueToken*)rtn->Value)->Details->BinOp.Op = active.Code;
-      ((ValueToken*)rtn->Value)->Details->BinOp.Left = left;
-      ((ValueToken*)rtn->Value)->Details->BinOp.Right = right;
+      ((ValueToken*)rtn->Value)->Details.BinOp = (BinOp*)malloc(sizeof(BinOp));
+      ((ValueToken*)rtn->Value)->Details.BinOp->Op = active.Code;
+      ((ValueToken*)rtn->Value)->Details.BinOp->Left = left;
+      ((ValueToken*)rtn->Value)->Details.BinOp->Right = right;
       skip_whitespace(&rtn->Cmd);
     }
     return 1;
@@ -172,8 +202,7 @@ UInt parse_non_op(ParseResult* rtn) {
     free(rtn->Value);
     rtn->Value = malloc(sizeof(ValueToken));
     ((ValueToken*)rtn->Value)->Id = value_int;
-    ((ValueToken*)rtn->Value)->Details = (ValueDetails*)malloc(sizeof(ValueDetails));
-    ((ValueToken*)rtn->Value)->Details->IntLiteral = u;
+    ((ValueToken*)rtn->Value)->Details.IntLiteral = u;
     return 1;
   }
   return parse_memory(rtn) || parse_bracketed(rtn);
@@ -259,7 +288,8 @@ UInt parse_call(ParseResult* rtn) {
     if (!parse_value(rtn)) FAIL();
     v = (ValueToken*)rtn->Value;
     if (!assert_at_end(rtn)) {
-      free_value(v);
+      free_value(*v);
+      free(v);
       FAIL();
     }
     rtn->Value = malloc(sizeof(CommandDetails));
@@ -282,7 +312,8 @@ UInt parse_goto(ParseResult* rtn) {
     if (!parse_value(rtn)) FAIL();
     v = (ValueToken*)rtn->Value;
     if (!assert_at_end(rtn)) {
-      free_value(v);
+      free_value(*v);
+      free(v);
       FAIL();
     }
     rtn->Value = malloc(sizeof(CommandDetails));
@@ -299,7 +330,8 @@ UInt parse_if(ParseResult* rtn) {
     if (!parse_value(rtn)) FAIL();
     v = (ValueToken*)rtn->Value;
     if (!assert_at_end(rtn)) {
-      free_value(v);
+      free_value(*v);
+      free(v);
       FAIL();
     }
     rtn->Value = malloc(sizeof(CommandDetails));
@@ -309,16 +341,27 @@ UInt parse_if(ParseResult* rtn) {
   )
 }
 UInt parse_input(ParseResult* rtn) {
+  char* rs = 0;
+  ValueToken* value;
   WITH_FAILURE (
     if (!check_ident("input", rtn)) FAIL();
-    /*
-      Input takes the form:
-      INPUT {STRING?} {MEMORY}
-    */
+    if (parse_raw_string(rtn)) {
+      rs = ((ValueToken*)rtn->Value)->Details.String;
+      free(rtn->Value);
+    }
+    if (!parse_memory(rtn)) {
+      free(rs);
+      FAIL();
+    }
+    value = (ValueToken*)rtn->Value;
+    rtn->Value = malloc(sizeof(CommandDetails));
+    ((CommandDetails*)rtn->Value)->Id = cmd_input;
+    ((CommandDetails*)rtn->Value)->Command.Input =
+      (InputCommand*)malloc(sizeof(InputCommand));
   )
 }
 UInt parse_let(ParseResult* rtn) {
-  ValueToken* memory,* value;
+  ValueToken memory, value;
   WITH_FAILURE (
     if (!check_ident("let", rtn)) FAIL();
     /*
@@ -327,7 +370,8 @@ UInt parse_let(ParseResult* rtn) {
     */
     skip_whitespace(&rtn->Cmd);
     if (!parse_memory(rtn)) FAIL();
-    memory = (ValueToken*)rtn->Value;
+    memory = *(ValueToken*)rtn->Value;
+    free(rtn->Value);
     skip_whitespace(&rtn->Cmd);
     if (!rtn->Cmd.Size || rtn->Cmd.Contents[0] != '=') {
       free_value(memory);
@@ -340,7 +384,8 @@ UInt parse_let(ParseResult* rtn) {
       free_value(memory);
       FAIL();
     }
-    value = (ValueToken*)rtn->Value;
+    value = *(ValueToken*)rtn->Value;
+    free(rtn->Value);
     rtn->Value = malloc(sizeof(CommandDetails));
     ((CommandDetails*)rtn->Value)->Id = cmd_let;
     ((CommandDetails*)rtn->Value)->Command.Let =
@@ -359,7 +404,8 @@ UInt parse_list(ParseResult* rtn) {
     if (!parse_value(rtn)) FAIL();
     v = (ValueToken*)rtn->Value;
     if (!assert_at_end(rtn)) {
-      free_value(v);
+      free_value(*v);
+      free(v);
       FAIL();
     }
     rtn->Value = malloc(sizeof(CommandDetails));
@@ -401,7 +447,8 @@ UInt parse_until(ParseResult* rtn) {
     if (!parse_value(rtn)) FAIL();
     v = (ValueToken*)rtn->Value;
     if (!assert_at_end(rtn)) {
-      free_value(v);
+      free_value(*v);
+      free(v);
       FAIL();
     }
     rtn->Value = malloc(sizeof(CommandDetails));
@@ -418,7 +465,8 @@ UInt parse_while(ParseResult* rtn) {
     if (!parse_value(rtn)) FAIL();
     v = (ValueToken*)rtn->Value;
     if (!assert_at_end(rtn)) {
-      free_value(v);
+      free_value(*v);
+      free(v);
       FAIL();
     }
     rtn->Value = malloc(sizeof(CommandDetails));
@@ -493,8 +541,10 @@ UInt parse_multiple(ParseResult* rtn) {
       parse_while(rtn) ||
       parse_until(rtn)
     )) {
-      free_command((CommandDetails*)rtn->Value);
-      free_command((CommandDetails*)backup.Value);
+      free_command(*(CommandDetails*)rtn->Value);
+      free(rtn->Value);
+      free_command(*(CommandDetails*)backup.Value);
+      free(backup.Value);
       backup = init;
       FAIL();
     }
@@ -505,9 +555,11 @@ UInt parse_multiple(ParseResult* rtn) {
       ((CommandDetails*)rtn->Value)->Command.Multiple =
         (MultipleCommand*)malloc(sizeof(MultipleCommand));
       ((CommandDetails*)rtn->Value)->Command.Multiple->Left =
-        (struct CommandDetails*)backup.Value;
+        *(CommandDetails*)backup.Value;
+      free(backup.Value);
       ((CommandDetails*)rtn->Value)->Command.Multiple->Right =
-        (struct CommandDetails*)tmp;
+        *(CommandDetails*)tmp;
+      free(tmp);
     }
     skip_whitespace(&rtn->Cmd);
     continue;

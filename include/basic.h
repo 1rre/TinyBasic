@@ -52,34 +52,6 @@ typedef enum {
   fun_sqt  /* SQuare rooT */
 } FunOpcode;
 
-typedef struct {
-  struct ValueToken* Left;
-  struct ValueToken* Right;
-  BinOpcode Op;
-} BinOp;
-
-typedef struct {
-  struct ValueToken* Value;
-  FunOpcode Op;
-} FunCall;
-
-typedef struct {
-  uint8_t name; /* a..z, A..Z */
-} Register;
-
-typedef struct {
-  struct ValueToken* Reference;
-} Memory;
-
-typedef union ValueDetails {
-  Register Register;
-  Memory Memory;
-  BinOp BinOp;
-  FunCall FunCall;
-  UInt IntLiteral;
-  char* String;
-} ValueDetails;
-
 typedef enum {
   value_null,
   value_register,
@@ -90,48 +62,30 @@ typedef enum {
   value_funcall
 } ValueId;
 
-typedef struct {
-  ValueDetails* Details;
+typedef union {
+  uint8_t Register;
+  struct ValueToken* Reference;
+  struct BinOp* BinOp;
+  struct FunCall* FunCall;
+  UInt IntLiteral;
+  char* String;
+} ValueDetails;
+
+typedef struct ValueToken {
+  ValueDetails Details;
   ValueId Id;
 } ValueToken;
 
-typedef struct {
-    ValueToken Lo;
-    ValueToken Hi;
-    ValueToken Step;
-} ForCommand;
+typedef struct BinOp {
+  ValueToken Left;
+  ValueToken Right;
+  BinOpcode Op;
+} BinOp;
 
 typedef struct {
-    char* Prompt;
-    ValueToken to;
-} InputCommand;
-
-
-typedef struct {
-    ValueToken* Memory;
-    ValueToken* Value;
-} LetCommand;
-
-typedef struct {
-  struct CommandDetails* Left;
-  struct CommandDetails* Right;
-} MultipleCommand;
-
-typedef struct {
-  char* Contents;
-  char* FullLine;
-  size_t Size;
-} UncompiledCommand;
-
-typedef union {
-  /* Call, Goto, If, Run, Until, While */
-  ValueToken* Value;
-  UncompiledCommand* Uncompiled;
-  MultipleCommand* Multiple;
-  InputCommand* Input;
-  LetCommand* Let;
-  ForCommand* For;
-} Command;
+  ValueToken Value;
+  FunOpcode Op;
+} FunCall;
 
 typedef enum {
   cmd_null,
@@ -153,24 +107,61 @@ typedef enum {
   cmd_while
 } CommandId;
 
-typedef struct CommandDetails {
+typedef union {
+  /* Call, Goto, If, Run, Until, While */
+  struct ValueToken* Value;
+  struct UncompiledCommand* Uncompiled;
+  struct MultipleCommand* Multiple;
+  struct InputCommand* Input;
+  struct LetCommand* Let;
+  struct ForCommand* For;
+} Command;
+
+typedef struct {
   CommandId Id;
   Command Command;
 } CommandDetails;
 
+typedef struct ForCommand {
+  ValueToken Lo;
+  ValueToken Hi;
+  ValueToken Step;
+} ForCommand;
+
+typedef struct InputCommand {
+  char* Prompt;
+  ValueToken To;
+} InputCommand;
+
+typedef struct LetCommand {
+  ValueToken Memory;
+  ValueToken Value;
+} LetCommand;
+
+typedef struct MultipleCommand {
+  CommandDetails Left;
+  CommandDetails Right;
+} MultipleCommand;
+
+typedef struct UncompiledCommand {
+  char* Contents;
+  char* FullLine;
+  size_t Size;
+} UncompiledCommand;
+
 typedef struct {
   UInt LineNum;
-  CommandDetails* Details;
+  CommandDetails Details;
 } CommandToken;
 
 typedef struct {
-  UncompiledCommand Cmd;
+  struct UncompiledCommand Cmd;
   void* Value;
 } ParseResult;
 
 void run_interpreter(void);
-void free_command(CommandDetails*);
-void free_value(ValueToken*);
+void free_command(CommandDetails);
+void free_value(ValueToken);
 
 UInt parse_unsigned(ParseResult*);
 UInt parse_line(ParseResult*);
