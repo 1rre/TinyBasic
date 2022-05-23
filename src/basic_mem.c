@@ -68,7 +68,9 @@ void free_command(CommandDetails cmd) {
       free(cmd.Command.Let);
     break;
     case cmd_print:
-      notimpl("Free Print");
+    /* DEPRECATED */
+      free_value(*cmd.Command.Value);
+      free(cmd.Command.Value);
     break;
     case cmd_multiple:
       free_command(cmd.Command.Multiple->Left);

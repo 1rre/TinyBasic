@@ -433,7 +433,21 @@ UInt parse_note(ParseResult* rtn) {
 }
 UInt parse_print(ParseResult* rtn) {
   WITH_FAILURE (
+    ValueToken* v;
     if (!check_ident("print", rtn)) FAIL();
+    skip_whitespace(&rtn->Cmd);
+    if (!parse_value(rtn)) FAIL();
+    v = (ValueToken*)rtn->Value;
+    if (!assert_at_end(rtn)) {
+      free_value(*v);
+      free(v);
+      FAIL();
+    }
+    rtn->Value = malloc(sizeof(CommandDetails));
+    ((CommandDetails*)rtn->Value)->Id = cmd_print;
+    ((CommandDetails*)rtn->Value)->Command.Value = v;
+    return 1;    
+  )
     /*
       Print takes the form:
       PRINT {FORMATTER} {VALUE*}
@@ -442,7 +456,6 @@ UInt parse_print(ParseResult* rtn) {
       And PRINTABLE is:
       [~s | ~u | ~i | [^~"]]
     */
-  )
 }
 UInt parse_until(ParseResult* rtn) {
   WITH_FAILURE (
@@ -559,7 +572,7 @@ UInt parse_multiple(ParseResult* rtn) {
       FAIL();
     }
     if (backup.Value) {
-      void* tmp = rtn->Value;
+      CommandDetails tmp = *(CommandDetails*)rtn->Value;
       rtn->Value = realloc(rtn->Value, sizeof(CommandDetails));
       ((CommandDetails*)rtn->Value)->Id = cmd_multiple;
       ((CommandDetails*)rtn->Value)->Command.Multiple =
@@ -567,9 +580,7 @@ UInt parse_multiple(ParseResult* rtn) {
       ((CommandDetails*)rtn->Value)->Command.Multiple->Left =
         *(CommandDetails*)backup.Value;
       free(backup.Value);
-      ((CommandDetails*)rtn->Value)->Command.Multiple->Right =
-        *(CommandDetails*)tmp;
-      free(tmp);
+      ((CommandDetails*)rtn->Value)->Command.Multiple->Right = tmp;
     }
     skip_whitespace(&rtn->Cmd);
     continue;

@@ -75,6 +75,8 @@ RCode run_command(StatementList*, CommandDetails*);
 
 RCode run_statements(StatementList s) {
   if (s) {
+    int x;
+    printf("Running %u -- Stack: %p\n", s->cmd.LineNum, &x);
     switch (run_command(&s, &s->cmd.Details)) {
       case rcode_stop:
         return rcode_stop;
@@ -97,6 +99,14 @@ StatementList get_statement(UInt i) {
   StatementList s = statements;
   while (s && s->cmd.LineNum < i) s = s->next;
   if (s && s->cmd.LineNum == i) return s;
+  else return 0;
+}
+
+StatementList get_statement_before(UInt i) {
+  StatementList s = statements;
+  StatementList last = 0;
+  while (s && s->cmd.LineNum < i) last = s, s = s->next;
+  if (last && s->cmd.LineNum == i) return last;
   else return 0;
 }
 
@@ -167,6 +177,40 @@ ResolvedValue do_binop(BinOp value) {
       rtn.Type = IntT;
       rtn.Value.Int = left.Value.Int != right.Value.Int;
     return rtn;
+    case op_lst:
+      rtn.Type = IntT;
+      rtn.Value.Int = left.Value.Int < right.Value.Int;
+    return rtn;
+    case op_gtt:
+      rtn.Type = IntT;
+      rtn.Value.Int = left.Value.Int > right.Value.Int;
+    return rtn;
+    case op_leq:
+      rtn.Type = IntT;
+      rtn.Value.Int = left.Value.Int <= right.Value.Int;
+    return rtn;
+    case op_geq:
+      rtn.Type = IntT;
+      rtn.Value.Int = left.Value.Int >= right.Value.Int;
+    return rtn;
+    case op_rem:
+      /* TODO: Check for zero */
+      rtn.Type = IntT;
+      rtn.Value.Int = left.Value.Int % right.Value.Int;
+    return rtn;
+    case op_div:
+      /* TODO: Check for zero */
+      rtn.Type = IntT;
+      rtn.Value.Int = left.Value.Int / right.Value.Int;
+    return rtn;
+    case op_lor:
+      rtn.Type = IntT;
+      rtn.Value.Int = left.Value.Int || right.Value.Int;
+    return rtn;
+    case op_lnd:
+      rtn.Type = IntT;
+      rtn.Value.Int = left.Value.Int && right.Value.Int;
+    return rtn;
     default:
       printf("Code is %d\n", value.Op);
       notimpl("Non basic ops");
@@ -182,30 +226,28 @@ ResolvedValue resolveValue(ValueToken* value) {
     case value_register:
       rtn.Type = IntT;
       rtn.Value.Int = variables[value->Details.Register];
-    break;
+    return rtn;
     case value_memory:
       rtn.Type = IntT;
       rtn.Value.Int =
         memory.UInt[resolveValue(value->Details.Reference).Value.Int];
-    break;
+    return rtn;
     case value_int:
       rtn.Type = IntT;
       rtn.Value.Int = value->Details.IntLiteral;
-    break;
+    return rtn;
     case value_string:
       rtn.Value.String = "";
       rtn.Type = StringT;
-    break;
+    return rtn;
     case value_binop:
       return do_binop(*value->Details.BinOp);
-    break;
     case value_funcall:
       notimpl("Function Calls");
       rtn.Value.String = "";
       rtn.Type = StringT;
-    break;
+    return rtn;
   }
-  return rtn;
 }
 
 RCode run_list(CommandDetails* cmd) {
@@ -295,11 +337,11 @@ RCode run_let(CommandDetails* cmd) {
   }
 }
 
-void update_uc(int* uc, CommandDetails deets) {
+void update_uc(int* uc, CommandDetails* deets) {
 
   ParseResult p;
   p.Value = 0;
-  switch (deets.Id) {
+  switch (deets->Id) {
     case cmd_multiple:
       notimpl("Multiple when searching for end");
     return;
@@ -310,10 +352,11 @@ void update_uc(int* uc, CommandDetails deets) {
       (*uc)--;
     return;
     case cmd_null:
-      p.Cmd = *deets.Command.Uncompiled;
+      p.Cmd = *deets->Command.Uncompiled;
       if (parse_line(&p)) {
-        update_uc(uc, *(CommandDetails*)p.Value);
-        free_command(*(CommandDetails*)p.Value);
+        free_command(*deets);
+        update_uc(uc, (CommandDetails*)p.Value);
+        *deets = *((CommandDetails*)p.Value);
         free(p.Value);
       }
     return;
@@ -331,7 +374,7 @@ RCode run_to_end(StatementList s, CommandDetails* cmd) {
 
 UInt find_next_end(StatementList* sl, int uc) {
   if (!(*sl)) return 0;
-  update_uc(&uc, (*sl)->cmd.Details);
+  update_uc(&uc, &(*sl)->cmd.Details);
   if (uc == 0) return 1;
   *sl = (*sl)->next;
   return find_next_end(sl, uc);
@@ -349,6 +392,13 @@ RCode predicate_inner(StatementList* sl, CommandDetails* cmd) {
   } else return rcode_end;
 }
 
+RCode run_print_deprecated(CommandDetails* cmd) {
+  ResolvedValue rv = resolveValue(cmd->Command.Value);
+  if (rv.Type == IntT) printf("%d\n", rv.Value.Int);
+  else if (rv.Type == StringT) printf("%d\n", rv.Value.String);
+  return rcode_continue;  
+}
+
 RCode run_command(StatementList* sl, CommandDetails* cmd) {
   ParseResult p;
   p.Value = 0;
@@ -359,14 +409,19 @@ RCode run_command(StatementList* sl, CommandDetails* cmd) {
   switch (cmd->Id) {
     case cmd_null:
       p.Cmd = *cmd->Command.Uncompiled;
-      if (parse_line(&p))
-        rtn = run_command(sl, (CommandDetails*)p.Value);
+      if (parse_line(&p)) {
+        if (p.Value && sl && *sl) {
+          free_command(*cmd);
+          (*sl)->cmd.Details = *(CommandDetails*)p.Value;
+          free(p.Value);
+          rtn = run_command(sl, &(*sl)->cmd.Details);
+        } else {
+          rtn = run_command(sl, (CommandDetails*)p.Value);
+          free(p.Value);
+        }
+      }
       else if (sl) printf(" On Line %u\n", (*sl)->cmd.LineNum);
       else if (cmd->Command.Uncompiled->Contents[0] != '\n') printf("\n");
-      if (p.Value) {
-        free_command(*(CommandDetails*)p.Value);
-        free(p.Value);
-      }
     return rtn;
     case cmd_if:
       s = *sl;
@@ -375,7 +430,7 @@ RCode run_command(StatementList* sl, CommandDetails* cmd) {
         return rcode_stop;
       }
       switch (predicate_inner(sl, cmd)) {
-        case rcode_continue: return run_to_end(s, cmd);
+        case rcode_continue: *sl = s; return rcode_continue;
         case rcode_stop: return rcode_stop;
         case rcode_end: return rcode_continue;
         default: return rcode_kill;
@@ -389,6 +444,8 @@ RCode run_command(StatementList* sl, CommandDetails* cmd) {
       while_start:
       switch (predicate_inner(sl, cmd)) {
         case rcode_continue:
+          /* TODO: REMOVE THIS       */
+          /* LEADS TO STACK OVERFLOW */
           run_to_end(s, cmd);
           goto while_start;
         case rcode_stop: return rcode_stop;
@@ -405,6 +462,8 @@ RCode run_command(StatementList* sl, CommandDetails* cmd) {
       switch (predicate_inner(sl, cmd)) {
         /* invert for until */
         case rcode_end:
+          /* TODO: REMOVE THIS       */
+          /* LEADS TO STACK OVERFLOW */
           run_to_end(s, cmd);
           goto until_start;
         case rcode_stop: return rcode_stop;
@@ -425,7 +484,8 @@ RCode run_command(StatementList* sl, CommandDetails* cmd) {
         printf("? goto non-int value\n");
         return rcode_stop;
       }
-      return run_from(rv.Value.Int);
+      (*sl) = get_statement_before(rv.Value.Int);
+      return rcode_continue;
     case cmd_call:
       rv = resolveValue(cmd->Command.Value);
       if (rv.Type != IntT) {
@@ -450,6 +510,8 @@ RCode run_command(StatementList* sl, CommandDetails* cmd) {
       case rcode_stop: return rcode_stop;
       case rcode_kill: return rcode_kill;
       }
+    case cmd_print:
+      return run_print_deprecated(cmd);
     default:
       printf("Unrecognised Command On Line %u!\n", (*sl)->cmd.LineNum);
     exit(1);
@@ -460,7 +522,10 @@ RCode update_env(char* input, size_t size) {
   ParseResult ln = {{input, input, size}, 0};
 
   /* Blank line - return nothing */
-  if (input[0] == '\n') return rcode_continue;
+  if (input[0] == '\n') {
+    free(input);
+    return rcode_continue;
+  }
   
   if (!strncmp(input, "KILL", 4)) {
     free(input);
@@ -482,13 +547,16 @@ RCode update_env(char* input, size_t size) {
   }
 
   /* Line number not given => run command */
-  UncompiledCommand uCmd = {input, input, size};
+  UncompiledCommand* uCmd = malloc(sizeof(UncompiledCommand));
+  uCmd->Contents = input;
+  uCmd->FullLine = input;
+  uCmd->Size = size;
   CommandToken cmd;
   RCode r;
   cmd.Details.Id = cmd_null;
-  cmd.Details.Command.Uncompiled = &uCmd;
+  cmd.Details.Command.Uncompiled = uCmd;
   r = run_command(0, &cmd.Details);
-  free(input);
+  free_command(cmd.Details);
   if (r != rcode_kill) return rcode_return;
   else return r;
 }
@@ -526,6 +594,6 @@ start:
 
   }
   free_all_statements();
-  list_registers();
+  //list_registers();
   free(memory.UInt);
 }

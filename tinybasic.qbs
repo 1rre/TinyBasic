@@ -6,7 +6,6 @@ Application {
   cpp.cLanguageVersion: "gnu2x"
   name: "tinybasic"
   cpp.optimization: "fast"
-  cpp.debugInformation: true
   files: [
     "src/main.c",
     "src/basic.c",
