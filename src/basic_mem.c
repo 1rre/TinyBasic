@@ -1,17 +1,24 @@
 #include "basic.h"
 #include <stdio.h>
 
-void free_value(ValueToken* val) {
-  if (!val) return;
-  switch (val->Id) {
+void free_value(ValueToken* value) {
+  if (!value) return;
+  if (!value->Details) {
+    free(value);
+    return;
+  }
+  switch (value->Id) {
+    case value_memory:
+      free_value((ValueToken*)value->Details->Memory.Reference);
+    break;
+    case value_binop:
+      free_value((ValueToken*)value->Details->BinOp.Left);
+      free_value((ValueToken*)value->Details->BinOp.Right);
+    break;
     case value_null:
     // ???
     break;
     case value_register:
-    // ???
-    break;
-    case value_memory:
-    // ???
     break;
     case value_string:
     // ???
@@ -19,9 +26,12 @@ void free_value(ValueToken* val) {
     case value_int:
     // TODO: Switch details to ptr & free
     break;
-  }
+    case value_funcall:
 
-  free(val);
+    break;
+  }
+  free(value->Details);
+  free(value);
 }
 
 void free_command(CommandDetails* cmd) {
@@ -29,7 +39,7 @@ void free_command(CommandDetails* cmd) {
   switch (cmd->Id) {
     case cmd_null:
       if (cmd->Command.Uncompiled) {
-        free(cmd->Command.Uncompiled->Contents);
+        free(cmd->Command.Uncompiled->FullLine);
         free(cmd->Command.Uncompiled);
       }
     break;

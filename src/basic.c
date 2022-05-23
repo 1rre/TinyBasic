@@ -11,6 +11,8 @@ union {
   char* String;
 } memory = {0};
 
+UInt mem_size = 0;
+
 #ifdef _WIN32
 size_t getline(char** buf, size_t* size, FILE* stream) {
   *buf = (char*)calloc(120, sizeof(char));
@@ -63,7 +65,9 @@ StatementList insert_cmd(CommandToken cmd, StatementList s) {
 typedef enum {
   rcode_stop,
   rcode_continue,
-  rcode_return
+  rcode_return,
+  rcode_end,
+  rcode_kill
 } RCode;
 
 RCode run_statements(StatementList);
@@ -75,14 +79,16 @@ RCode run_statements(StatementList s) {
       case rcode_stop:
         return rcode_stop;
       case rcode_continue:
-        //__attribute__((musttail))
         return run_statements(s->next);
       case rcode_return:
         return rcode_continue;
+      case rcode_end:
+        printf("? Unexpected END");
+        return rcode_stop;
       default: exit(1);
     }
   } else {
-    printf("Reached the end of control without stop.\n");
+    printf("? beyond end of control\n");
     return rcode_stop;
   }
 }
@@ -103,10 +109,59 @@ RCode run_from(UInt i) {
   }
 }
 
-typedef union {
-  char* String;
-  UInt Int;
+enum ValueType {
+  NullT,
+  StringT,
+  IntT
+};
+
+typedef struct {
+  enum ValueType Type;
+   union {
+    char* String;
+    UInt Int;
+  } Value;
 } ResolvedValue;
+
+ResolvedValue resolveValue(ValueToken*);
+
+ResolvedValue do_binop(BinOp value) {
+  ResolvedValue left = resolveValue((ValueToken*)value.Left);
+  ResolvedValue right = resolveValue((ValueToken*)value.Right);
+  ResolvedValue rtn;
+  if (left.Type != IntT || right.Type != IntT) {
+    printf("? binop: non-int value\n");
+    rtn.Type = NullT;
+    return rtn;
+  }
+  rtn.Type = IntT;
+  switch (value.Op) {
+    case op_add:
+      if (MAX_LOCAL_INT - left.Value.Int < right.Value.Int) {
+        printf("? overflow\n");
+        rtn.Type = NullT;
+        return rtn;
+      }
+      rtn.Value.Int = left.Value.Int + right.Value.Int;
+    return rtn;
+    case op_sub:
+      /* TODO: Detect underflow */
+      rtn.Value.Int = left.Value.Int - right.Value.Int;
+    return rtn;
+    case op_mul:
+      if (left.Value.Int && MAX_LOCAL_INT / left.Value.Int < right.Value.Int) {
+        printf("? overflow\n");
+        rtn.Type = NullT;
+        return rtn;
+      }
+      rtn.Value.Int = left.Value.Int * right.Value.Int;
+    return rtn;
+    default:
+      printf("Code is %d\n", value.Op);
+      notimpl("Non basic ops");
+    return rtn;
+  }
+}
 
 ResolvedValue resolveValue(ValueToken* value) {
   ResolvedValue rtn;
@@ -115,45 +170,112 @@ ResolvedValue resolveValue(ValueToken* value) {
     case value_null: // Error?
       exit(1);
     case value_register:
-      rtn.Int = variables[value->Details->Register.name];
+      rtn.Type = IntT;
+      rtn.Value.Int = variables[value->Details->Register.name];
     break;
     case value_memory:
-      rtn = resolveValue(
+      rtn.Type = IntT;
+      rtn.Value.Int = memory.UInt[resolveValue(
         (ValueToken*)value->Details->Memory.Reference
-      );
+      ).Value.Int];
     break;
     case value_int:
-      rtn.Int = value->Details->IntLiteral;
+      rtn.Type = IntT;
+      rtn.Value.Int = value->Details->IntLiteral;
     break;
     case value_string:
-      rtn.String = "";
-      notimpl("String");
+      rtn.Value.String = "";
+      rtn.Type = StringT;
+    break;
+    case value_binop:
+      return do_binop(value->Details->BinOp);
+    break;
+    case value_funcall:
+      notimpl("Function Calls");
+      rtn.Value.String = "";
+      rtn.Type = StringT;
     break;
   }
   return rtn;
 }
 
 RCode run_list(CommandDetails* cmd) {
-  if (!cmd) {
-    printf("? command null\n");
+  ResolvedValue r = resolveValue(cmd->Command.Value);
+  if (r.Type != IntT) {
+    printf("? list: non-int value\n");
     return rcode_stop;
   }
-  UInt line = resolveValue(cmd->Command.Value).Int;
+  UInt line = r.Value.Int;
   StatementList s = get_statement(line);
-  printf("%s\n", s->cmd.Details->Command.Uncompiled->Contents);
+  if (s) {
+    printf("%s", s->cmd.Details->Command.Uncompiled->FullLine);
+    return rcode_continue;
+  } else {
+    printf("? undefined line %u\n", line);
+  }
+}
+
+RCode set_register(Register r, ValueToken* t) {
+  ResolvedValue rv = resolveValue(t);
+  if (rv.Type != IntT) {
+    printf("? set: non-int value\n");
+    return rcode_stop;
+  }
+  variables[r.name] = rv.Value.Int;
   return rcode_continue;
 }
 
+RCode set_memory(Memory m, ValueToken* t) {
+  ResolvedValue rv = resolveValue(t);
+  ResolvedValue loc = resolveValue((ValueToken*)m.Reference);
+  if (loc.Type != IntT) {
+    printf("? set[]: non-int value\n");
+    return rcode_stop;
+  }
+  if (rv.Type == IntT) {
+    if (mem_size <= loc.Value.Int) {
+      memory.UInt = (UInt*)realloc(memory.UInt, loc.Value.Int * sizeof(UInt));
+      mem_size = loc.Value.Int - 1;
+    }
+    memory.UInt[loc.Value.Int] = rv.Value.Int;
+  } else if (rv.Type == StringT) {
+    notimpl("String");
+  }
+  return rcode_continue;
+}
+
+RCode run_let(CommandDetails* cmd) {
+  switch (cmd->Command.Let->Memory.Id) {
+    case value_register:
+      return set_register(
+        cmd->Command.Let->Memory.Details->Register,
+        &cmd->Command.Let->Value
+      );
+    case value_memory:
+      return set_memory(
+        cmd->Command.Let->Memory.Details->Memory,
+        &cmd->Command.Let->Value
+      );
+    default:
+      printf("? non-settable memory");
+      return rcode_stop;
+  }
+}
+
 RCode run_command(CommandDetails* cmd, UInt* LineNum) {
-  CommandDetails* c;
+  ParseResult p;
+  p.Value = 0;
   RCode rtn = rcode_stop;
+  ResolvedValue rv;
+
   switch (cmd->Id) {
     case cmd_null:
-      c = parse_command(*cmd->Command.Uncompiled);
-      if (c && c->Id != cmd_null) rtn = run_command(c, LineNum);
+      p.Cmd = *cmd->Command.Uncompiled;
+      if (parse_line(&p))
+        rtn = run_command((CommandDetails*)p.Value, LineNum);
       else if (LineNum) printf(" On Line %u\n", *LineNum);
       else if (cmd->Command.Uncompiled->Contents[0] != '\n') printf("\n");
-      if (c) free_command(c);
+      if (p.Value) free_command((CommandDetails*)p.Value);
     return rtn;
     case cmd_if:
       notimpl("IF");
@@ -168,26 +290,35 @@ RCode run_command(CommandDetails* cmd, UInt* LineNum) {
     case cmd_list:
       return run_list(cmd);
     case cmd_let:
-      notimpl("LET");
+      return run_let(cmd);
     case cmd_goto:
-      /* TODO: Next line <- goto...
-               Is it necessary to return "return" || stop here due to run_statements?
-      */
-      notimpl("GOTO");
+      rv = resolveValue(cmd->Command.Value);
+      if (rv.Type != IntT) {
+        printf("? goto non-int value\n");
+        return rcode_stop;
+      }
+      return run_from(rv.Value.Int);
     case cmd_call:
-      notimpl("CALL");
-    case cmd_end:
-      notimpl("END");
+      rv = resolveValue(cmd->Command.Value);
+      if (rv.Type != IntT) {
+        printf("? call non-int value\n");
+        return rcode_stop;
+      }
+      if (run_from(rv.Value.Int) == rcode_stop)
+        return rcode_stop;
+      else return rcode_continue;
+    case cmd_end: return rcode_end;
     case cmd_run: return run_statements(statements);
     case cmd_return: return rcode_return;
     case cmd_stop: return rcode_stop;
     case cmd_note: return rcode_continue;
     case cmd_multiple:
+    /* TODO: Ensure support for if; ...; end in one line */
       switch (run_command(cmd->Command.Multiple->Left, LineNum)) {
       case rcode_continue:
-        //__attribute__((musttail))
         return run_command(cmd->Command.Multiple->Right, LineNum);
       case rcode_return: return rcode_continue;
+      case rcode_end: return rcode_end;
       case rcode_stop: return rcode_stop;
       }
     default:
@@ -197,29 +328,43 @@ RCode run_command(CommandDetails* cmd, UInt* LineNum) {
 }
 
 RCode update_env(char* input, size_t size) {
-  // TODO: Parse input
-  ParseResult ln = parse_linenum(input, size);
-  CommandToken cmd;
-  cmd.Details = (CommandDetails*)malloc(sizeof(CommandDetails));
-  UncompiledCommand* uCmd =
-    (UncompiledCommand*)malloc(sizeof(UncompiledCommand));
-  if (ln.value) {
-    uCmd->Contents = input, uCmd->Size = size - (ln.position - input);
-    cmd.Details->Command.Uncompiled = uCmd;
+  ParseResult ln = {{input, input, size}, 0};
+
+  /* Blank line - return nothing */
+  if (input[0] == '\n') return rcode_continue;
+  
+  if (!strncmp(input, "KILL", 4)) {
+    free(input);
+    return rcode_kill;
+  }
+  
+  /* Line number given => store uncompiled */
+  if (parse_unsigned(&ln)) {
+    UncompiledCommand* uCmd =
+      (UncompiledCommand*)malloc(sizeof(UncompiledCommand));
+    CommandToken cmd;
+    cmd.Details = (CommandDetails*)malloc(sizeof(CommandDetails));
     cmd.Details->Id = cmd_null;
-    cmd.LineNum = *(UInt*)ln.value;
-    free(ln.value);
+    cmd.Details->Command.Uncompiled = uCmd;
+    *uCmd = ln.Cmd;
+    cmd.LineNum = *((UInt*)ln.Value);
+    free(ln.Value);
     statements = insert_cmd(cmd, statements);
     return rcode_continue;
-  } else {
-    uCmd->Contents = input;
-    uCmd->Size = size;
-    cmd.Details->Command.Uncompiled = uCmd;
-    cmd.Details->Id = cmd_null;
-    run_command(cmd.Details, 0);
-    free_command(cmd.Details);
-    return rcode_return;
   }
+
+  /* Line number not given => run command */
+  UncompiledCommand uCmd = {input, input, size};
+  CommandToken cmd;
+  CommandDetails det;
+  RCode r;
+  cmd.Details = &det;
+  det.Id = cmd_null;
+  det.Command.Uncompiled = &uCmd;
+  r = run_command(cmd.Details, 0);
+  free(input);
+  if (r != rcode_kill) return rcode_return;
+  else return r;
 }
 
 void run_interpreter() {
@@ -240,8 +385,13 @@ start:
     case rcode_return:
       printf("READY\n");
       goto start;
+    case rcode_end:
+      printf("? nothing to end\nREADY\n");
+      goto start;
     case rcode_stop:
+    case rcode_kill:
       printf("Goodbye\n");
+
   }
   free_all_statements();
 }

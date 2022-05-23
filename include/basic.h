@@ -20,12 +20,12 @@ typedef enum {
   op_mul, /* MULtiply*/
   op_div, /* DIVide */
   op_rem, /* REMainder */
-  op_eqs, /* EQualS */
-  op_neq, /* Not EQuals */
   op_gtt, /* GreaTer Than */
   op_lst, /* LeSs Than */
   op_geq, /* Greater than or EQual to */
   op_leq, /* Less than or EQual to */
+  op_eqs, /* EQualS */
+  op_neq, /* Not EQuals */
   op_bor, /* Bitwise OR */
   op_bnd, /* Bitwise aND */
   op_bxr, /* Bitwise XoR */
@@ -85,7 +85,9 @@ typedef enum {
   value_register,
   value_memory,
   value_int,
-  value_string
+  value_string,
+  value_binop,
+  value_funcall
 } ValueId;
 
 typedef struct {
@@ -117,6 +119,7 @@ typedef struct {
 
 typedef struct {
   char* Contents;
+  char* FullLine;
   size_t Size;
 } UncompiledCommand;
 
@@ -161,16 +164,15 @@ typedef struct {
 } CommandToken;
 
 typedef struct {
-  char* position;
-  void* value;
+  UncompiledCommand Cmd;
+  void* Value;
 } ParseResult;
 
 void run_interpreter(void);
 void free_command(CommandDetails*);
 void free_value(ValueToken*);
 
-CommandDetails* parse_command(UncompiledCommand);
-
-ParseResult parse_linenum(char*, size_t);
+UInt parse_unsigned(ParseResult*);
+UInt parse_line(ParseResult*);
 
 #endif /* header_basic */

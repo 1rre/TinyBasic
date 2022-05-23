@@ -3,4 +3,6 @@
 build/
 default/
 out/
-**.old
+**.old*
+**/a.out
+vgcore*
