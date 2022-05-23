@@ -59,7 +59,9 @@ UInt parse_raw_string(ParseResult* rtn) {
       rtn->Cmd.Size--;
     }
     if (!rtn->Cmd.Size || rtn->Cmd.Contents[0] != '"') FAIL();
-    rtn->Value = malloc(sizeof(ValueToken));
+    rtn->Cmd.Contents++;
+    rtn->Cmd.Size--;
+    rtn->Value = realloc(rtn->Value, sizeof(ValueToken));
     ((ValueToken*)rtn->Value)->Id = value_string;
     ((ValueToken*)rtn->Value)->Details.String =
       (char*)malloc((i + 1) * sizeof(char));
@@ -108,8 +110,7 @@ UInt parse_unsigned(ParseResult* rtn) {
       rtn->Cmd.Contents++;
       rtn->Cmd.Size--;
     }
-
-    rtn->Value = malloc(sizeof(UInt));
+    rtn->Value = realloc(rtn->Value, sizeof(UInt));
     *((UInt*)rtn->Value) = s;
     return 1;
   )
@@ -119,7 +120,7 @@ UInt parse_register(ParseResult* rtn) {
   WITH_FAILURE (
     skip_whitespace(&rtn->Cmd);
     if (!rtn->Cmd.Size || !is_letter(rtn->Cmd.Contents[0])) FAIL();
-    rtn->Value = malloc(sizeof(ValueToken));
+    rtn->Value = realloc(rtn->Value, sizeof(ValueToken));
     ((ValueToken*)rtn->Value)->Id = value_register;
     ((ValueToken*)rtn->Value)->Details.Register =
       (rtn->Cmd.Contents[0] | 32) - 'a';
@@ -177,15 +178,17 @@ UInt parse_binop (
         /* Beyond here, it is a known syntax error *
          * As we have passed the op symbol         */
         free_value(left);
+        free(rtn->Value);
         FAIL();
       }
       right = *(ValueToken*)rtn->Value;
-      rtn->Value = malloc(sizeof(ValueToken));
+      rtn->Value = realloc(rtn->Value, sizeof(ValueToken));
       ((ValueToken*)rtn->Value)->Id = value_binop;
       ((ValueToken*)rtn->Value)->Details.BinOp = (BinOp*)malloc(sizeof(BinOp));
       ((ValueToken*)rtn->Value)->Details.BinOp->Op = active.Code;
       ((ValueToken*)rtn->Value)->Details.BinOp->Left = left;
       ((ValueToken*)rtn->Value)->Details.BinOp->Right = right;
+
       skip_whitespace(&rtn->Cmd);
     }
     return 1;
@@ -199,8 +202,7 @@ UInt parse_memory(ParseResult* rtn) {
 UInt parse_non_op(ParseResult* rtn) {
   if (parse_unsigned(rtn)) {
     UInt u = *(UInt*)rtn->Value;
-    free(rtn->Value);
-    rtn->Value = malloc(sizeof(ValueToken));
+    rtn->Value = realloc(rtn->Value, sizeof(ValueToken));
     ((ValueToken*)rtn->Value)->Id = value_int;
     ((ValueToken*)rtn->Value)->Details.IntLiteral = u;
     return 1;
@@ -275,7 +277,7 @@ UInt parse_value(ParseResult* rtn) {
 UInt check_ident(const char* ident, ParseResult* rtn) {
   if (*ident && rtn->Cmd.Size) {
     return
-      *ident == *rtn->Cmd.Contents &&
+      *ident == (*rtn->Cmd.Contents | 32) &&
       (rtn->Cmd.Contents++, rtn->Cmd.Size--, check_ident(ident+1, rtn));
   } else return !(*ident);
 }
@@ -292,7 +294,7 @@ UInt parse_call(ParseResult* rtn) {
       free(v);
       FAIL();
     }
-    rtn->Value = malloc(sizeof(CommandDetails));
+    rtn->Value = realloc(rtn->Value, sizeof(CommandDetails));
     ((CommandDetails*)rtn->Value)->Id = cmd_call;
     ((CommandDetails*)rtn->Value)->Command.Value = v;
     return 1;
@@ -342,22 +344,26 @@ UInt parse_if(ParseResult* rtn) {
 }
 UInt parse_input(ParseResult* rtn) {
   char* rs = 0;
-  ValueToken* value;
+  ValueToken value;
   WITH_FAILURE (
     if (!check_ident("input", rtn)) FAIL();
     if (parse_raw_string(rtn)) {
       rs = ((ValueToken*)rtn->Value)->Details.String;
-      free(rtn->Value);
     }
+    skip_whitespace(&rtn->Cmd);
     if (!parse_memory(rtn)) {
       free(rs);
+      free(rtn->Value);
       FAIL();
     }
-    value = (ValueToken*)rtn->Value;
-    rtn->Value = malloc(sizeof(CommandDetails));
+    value = *(ValueToken*)rtn->Value;
+    rtn->Value = realloc(rtn->Value, sizeof(CommandDetails));
     ((CommandDetails*)rtn->Value)->Id = cmd_input;
     ((CommandDetails*)rtn->Value)->Command.Input =
       (InputCommand*)malloc(sizeof(InputCommand));
+    ((CommandDetails*)rtn->Value)->Command.Input->Prompt = rs;
+    ((CommandDetails*)rtn->Value)->Command.Input->To = value;
+    return 1;
   )
 }
 UInt parse_let(ParseResult* rtn) {
@@ -371,10 +377,10 @@ UInt parse_let(ParseResult* rtn) {
     skip_whitespace(&rtn->Cmd);
     if (!parse_memory(rtn)) FAIL();
     memory = *(ValueToken*)rtn->Value;
-    free(rtn->Value);
     skip_whitespace(&rtn->Cmd);
     if (!rtn->Cmd.Size || rtn->Cmd.Contents[0] != '=') {
       free_value(memory);
+      free(rtn->Value);
       FAIL();
     }
     rtn->Cmd.Contents++;
@@ -382,11 +388,11 @@ UInt parse_let(ParseResult* rtn) {
     skip_whitespace(&rtn->Cmd);
     if (!parse_value(rtn)) {
       free_value(memory);
+      free(rtn->Value);
       FAIL();
     }
     value = *(ValueToken*)rtn->Value;
-    free(rtn->Value);
-    rtn->Value = malloc(sizeof(CommandDetails));
+    rtn->Value = realloc(rtn->Value, sizeof(CommandDetails));
     ((CommandDetails*)rtn->Value)->Id = cmd_let;
     ((CommandDetails*)rtn->Value)->Command.Let =
       (LetCommand*)malloc(sizeof(LetCommand));
@@ -541,16 +547,20 @@ UInt parse_multiple(ParseResult* rtn) {
       parse_while(rtn) ||
       parse_until(rtn)
     )) {
-      free_command(*(CommandDetails*)rtn->Value);
-      free(rtn->Value);
-      free_command(*(CommandDetails*)backup.Value);
-      free(backup.Value);
+      if (rtn->Value) {
+        free_command(*(CommandDetails*)rtn->Value);
+        free(rtn->Value);
+      }
+      if (backup.Value) {
+        free_command(*(CommandDetails*)backup.Value);
+        free(backup.Value);
+      }
       backup = init;
       FAIL();
     }
     if (backup.Value) {
       void* tmp = rtn->Value;
-      rtn->Value = malloc(sizeof(CommandDetails));
+      rtn->Value = realloc(rtn->Value, sizeof(CommandDetails));
       ((CommandDetails*)rtn->Value)->Id = cmd_multiple;
       ((CommandDetails*)rtn->Value)->Command.Multiple =
         (MultipleCommand*)malloc(sizeof(MultipleCommand));

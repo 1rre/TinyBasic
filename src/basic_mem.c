@@ -49,10 +49,18 @@ void free_command(CommandDetails cmd) {
       }
     break;
     case cmd_for:
-      notimpl("Free For");
+      if (cmd.Command.For) {
+        free_value(cmd.Command.For->Hi);
+        free_value(cmd.Command.For->Lo);
+        free_value(cmd.Command.For->Step);
+      }
     break;
     case cmd_input:
-      notimpl("Free Input");
+      if (cmd.Command.Input) {
+        free(cmd.Command.Input->Prompt);
+        free_value(cmd.Command.Input->To);
+        free(cmd.Command.Input);
+      }
     break;
     case cmd_let:
       free_value(cmd.Command.Let->Memory);

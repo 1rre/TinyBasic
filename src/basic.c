@@ -249,8 +249,8 @@ RCode set_memory(ValueToken* m, ValueToken* t) {
 
 RCode run_input(CommandDetails* cmd) {
   printf("%s", cmd->Command.Input->Prompt);
-  char* x;
-  size_t size;
+  char* x = 0;
+  size_t size = 0;
   getline(&x, &size, stdin);
   UInt v = atoi(x);
   free(x);
