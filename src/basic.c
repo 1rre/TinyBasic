@@ -74,14 +74,17 @@ RCode run_statements(StatementList);
 RCode run_command(StatementList*, CommandDetails*);
 
 RCode run_statements(StatementList s) {
+  start:
   if (s) {
     int x;
-    printf("Running %u -- Stack: %p\n", s->cmd.LineNum, &x);
     switch (run_command(&s, &s->cmd.Details)) {
       case rcode_stop:
         return rcode_stop;
       case rcode_continue:
-        if (s) return run_statements(s->next);
+        if (s) {
+          s = s->next;
+          goto start;
+        }
         printf("? Undefined statement\n");
         return rcode_stop;
       /* These should both work the same */

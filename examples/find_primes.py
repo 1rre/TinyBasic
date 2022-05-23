@@ -7,7 +7,7 @@ def isPrime(n):
 
 numPrimes = 0
 
-for i in range(2, 1001):
+for i in range(2, 10001):
   numPrimes += isPrime(i)
 
 
