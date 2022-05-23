@@ -236,8 +236,19 @@ UInt check_ident(const char* ident, ParseResult* rtn) {
 
 UInt parse_call(ParseResult* rtn) {
   WITH_FAILURE (
+    ValueToken* v;
     if (!check_ident("call", rtn)) FAIL();
-    
+    skip_whitespace(&rtn->Cmd);
+    if (!parse_value(rtn)) FAIL();
+    v = (ValueToken*)rtn->Value;
+    if (!assert_at_end(rtn)) {
+      free_value(v);
+      FAIL();
+    }
+    rtn->Value = malloc(sizeof(CommandDetails));
+    ((CommandDetails*)rtn->Value)->Id = cmd_call;
+    ((CommandDetails*)rtn->Value)->Command.Value = v;
+    return 1;
   )
 }
 UInt parse_for(ParseResult* rtn) {
@@ -248,25 +259,54 @@ UInt parse_for(ParseResult* rtn) {
 }
 UInt parse_goto(ParseResult* rtn) {
   WITH_FAILURE (
+    ValueToken* v;
     if (!check_ident("goto", rtn)) FAIL();
+    skip_whitespace(&rtn->Cmd);
+    if (!parse_value(rtn)) FAIL();
+    v = (ValueToken*)rtn->Value;
+    if (!assert_at_end(rtn)) {
+      free_value(v);
+      FAIL();
+    }
+    rtn->Value = malloc(sizeof(CommandDetails));
+    ((CommandDetails*)rtn->Value)->Id = cmd_goto;
+    ((CommandDetails*)rtn->Value)->Command.Value = v;
+    return 1;
   )
 }
 UInt parse_if(ParseResult* rtn) {
   WITH_FAILURE (
+    ValueToken* v;
     if (!check_ident("if", rtn)) FAIL();
-    
+    skip_whitespace(&rtn->Cmd);
+    if (!parse_value(rtn)) FAIL();
+    v = (ValueToken*)rtn->Value;
+    if (!assert_at_end(rtn)) {
+      free_value(v);
+      FAIL();
+    }
+    rtn->Value = malloc(sizeof(CommandDetails));
+    ((CommandDetails*)rtn->Value)->Id = cmd_if;
+    ((CommandDetails*)rtn->Value)->Command.Value = v;
+    return 1;
   )
 }
 UInt parse_input(ParseResult* rtn) {
   WITH_FAILURE (
     if (!check_ident("input", rtn)) FAIL();
-    
+    /*
+      Input takes the form:
+      INPUT {STRING?} {MEMORY}
+    */
   )
 }
 UInt parse_let(ParseResult* rtn) {
   WITH_FAILURE (
     if (!check_ident("let", rtn)) FAIL();
-    
+    /*
+      Let takes the form:
+      LET {MEMORY} = {VALUE}
+    */
   )
 }
 UInt parse_list(ParseResult* rtn) {
@@ -274,6 +314,7 @@ UInt parse_list(ParseResult* rtn) {
     ValueToken* v;
     if (!check_ident("list", rtn)) FAIL();
     skip_whitespace(&rtn->Cmd);
+    /* Should `list` be valid on its own? */
     if (!parse_value(rtn)) FAIL();
     v = (ValueToken*)rtn->Value;
     if (!assert_at_end(rtn)) {
@@ -289,6 +330,10 @@ UInt parse_list(ParseResult* rtn) {
 UInt parse_note(ParseResult* rtn) {
   WITH_FAILURE (
     if (!check_ident("note", rtn)) FAIL();
+    while (rtn->Cmd.Contents[0] != '\n' && rtn->Cmd.Contents[0] != ';') {
+      rtn->Cmd.Contents++;
+      rtn->Cmd.Size--;
+    }
     rtn->Value = malloc(sizeof(CommandDetails));
     ((CommandDetails*)rtn->Value)->Id = cmd_note;
     return 1;
@@ -297,19 +342,48 @@ UInt parse_note(ParseResult* rtn) {
 UInt parse_print(ParseResult* rtn) {
   WITH_FAILURE (
     if (!check_ident("print", rtn)) FAIL();
-    
+    /*
+      Print takes the form:
+      PRINT {FORMATTER} {VALUE*}
+      Where FORMATTER is:
+      "{PRINTABLE*}"
+      And PRINTABLE is:
+      [~s | ~u | ~i | [^~"]]
+    */
   )
 }
 UInt parse_until(ParseResult* rtn) {
   WITH_FAILURE (
+    ValueToken* v;
     if (!check_ident("until", rtn)) FAIL();
-    
+    skip_whitespace(&rtn->Cmd);
+    if (!parse_value(rtn)) FAIL();
+    v = (ValueToken*)rtn->Value;
+    if (!assert_at_end(rtn)) {
+      free_value(v);
+      FAIL();
+    }
+    rtn->Value = malloc(sizeof(CommandDetails));
+    ((CommandDetails*)rtn->Value)->Id = cmd_until;
+    ((CommandDetails*)rtn->Value)->Command.Value = v;
+    return 1;    
   )
 }
 UInt parse_while(ParseResult* rtn) {
   WITH_FAILURE (
+    ValueToken* v;
     if (!check_ident("while", rtn)) FAIL();
-    
+    skip_whitespace(&rtn->Cmd);
+    if (!parse_value(rtn)) FAIL();
+    v = (ValueToken*)rtn->Value;
+    if (!assert_at_end(rtn)) {
+      free_value(v);
+      FAIL();
+    }
+    rtn->Value = malloc(sizeof(CommandDetails));
+    ((CommandDetails*)rtn->Value)->Id = cmd_while;
+    ((CommandDetails*)rtn->Value)->Command.Value = v;
+    return 1;    
   )
 }
 UInt parse_end(ParseResult* rtn) {
@@ -349,25 +423,64 @@ UInt parse_stop(ParseResult* rtn) {
   )
 }
 
+UInt skip_sc(ParseResult* rtn) {
+  while (rtn->Cmd.Size && rtn->Cmd.Contents[0] == ';') {
+    rtn->Cmd.Size--;
+    rtn->Cmd.Contents++;
+  }
+  return 1;
+}
+
+UInt parse_multiple(ParseResult* rtn) {
+  ParseResult init = *rtn;
+  do {
+    ParseResult backup = *rtn;
+    skip_whitespace(&rtn->Cmd);
+    if (!(
+      parse_call(rtn) ||
+      parse_for(rtn) ||
+      parse_goto(rtn) ||
+      parse_if(rtn) ||
+      parse_input(rtn) ||
+      parse_let(rtn) ||
+      parse_list(rtn) ||
+      parse_note(rtn) ||
+      parse_print(rtn) ||
+      parse_run(rtn) ||
+      parse_return(rtn) ||
+      parse_stop(rtn) ||
+      parse_while(rtn) ||
+      parse_until(rtn)
+    )) {
+      free_command((CommandDetails*)rtn->Value);
+      free_command((CommandDetails*)backup.Value);
+      backup = init;
+      FAIL();
+    }
+    if (backup.Value) {
+      void* tmp = rtn->Value;
+      rtn->Value = malloc(sizeof(CommandDetails));
+      ((CommandDetails*)rtn->Value)->Id = cmd_multiple;
+      ((CommandDetails*)rtn->Value)->Command.Multiple =
+        (MultipleCommand*)malloc(sizeof(MultipleCommand));
+      ((CommandDetails*)rtn->Value)->Command.Multiple->Left =
+        (struct CommandDetails*)backup.Value;
+      ((CommandDetails*)rtn->Value)->Command.Multiple->Right =
+        (struct CommandDetails*)tmp;
+    }
+    skip_whitespace(&rtn->Cmd);
+    continue;
+    failure:
+    *rtn = backup;
+    return 0;
+  } while (rtn->Cmd.Size && rtn->Cmd.Contents[0] == ';' && skip_sc(rtn));
+  return 1;
+}
+
 UInt parse_line(ParseResult* rtn) {
   skip_whitespace(&rtn->Cmd);
   if (rtn->Cmd.Size <= 0) goto syntax_error;
-  if (
-    parse_call(rtn) ||
-    parse_for(rtn) ||
-    parse_goto(rtn) ||
-    parse_if(rtn) ||
-    parse_input(rtn) ||
-    parse_let(rtn) ||
-    parse_list(rtn) ||
-    parse_note(rtn) ||
-    parse_print(rtn) ||
-    parse_run(rtn) ||
-    parse_return(rtn) ||
-    parse_stop(rtn) ||
-    parse_while(rtn) ||
-    parse_until(rtn)
-  ) return 1;
+  return parse_multiple(rtn);
 syntax_error:
   printf("? syntax error");
   return 0;

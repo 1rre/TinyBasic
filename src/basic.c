@@ -320,6 +320,7 @@ RCode run_command(CommandDetails* cmd, UInt* LineNum) {
       case rcode_return: return rcode_continue;
       case rcode_end: return rcode_end;
       case rcode_stop: return rcode_stop;
+      case rcode_kill: return rcode_kill;
       }
     default:
       printf("Unrecognised Command On Line %u!\n", *LineNum);
