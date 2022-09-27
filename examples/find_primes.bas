@@ -1,5 +1,5 @@
 10  let lo = 2
-20  let hi = 10001
+20  let hi = 10000
 30  let i = lo
 35  let c = 0
 40  if i >= hi
@@ -15,6 +15,7 @@
 105 let j = j + 1
 110 goto 76
 120 let c = c + 1
+125 print i
 130 let i = i + 1
 140 goto 40
 155 print c

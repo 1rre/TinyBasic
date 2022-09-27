@@ -1,0 +1,4 @@
+100    INPUT  x
+200    FORMAT "you entered ~i~n" x
+300    STOP 
+       RUN

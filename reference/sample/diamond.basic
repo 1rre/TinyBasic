@@ -1,0 +1,34 @@
+      LET   pointer = 0
+      PRINT "DIAMOND~n~n~n~n"
+      PRINT "FOR A PRETTY DIAMOND PATTERN,~n"
+      INPUT "TYPE IN AN ODD NUMBER BETWEEN 5 AND 21" r
+      PRINT "~n"
+      LET   q = 60 / r
+      LET   a = pointer
+      LET   pointer = pointer + 3
+      LET   [a] = "cc"
+      FOR l IN 0 UNTIL q
+        LET   x = 1
+        LET   y = r
+        LET   z = 2
+20      FOR n IN x TO y BY z
+          PRINT "~t~n" (r-n)/2
+          FOR m IN 0 UNTIL q
+            LET   c = 1
+            FOR a IN 0 UNTIL n
+              IF c > LEN([a])
+                PRINT "!~n"
+                GOTO  50
+              END
+              PRINT [a]
+              LET   c = c + 1
+50          END
+            IF m = q; GOTO 60; END
+          END
+60      PRINT "~n"
+        END
+        IF x ≠ 1; GOTO 95; END
+        LET X = R - 2; LET Y = 1; LET Z = -2
+        GOTO 20
+95    END
+      STOP

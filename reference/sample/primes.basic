@@ -1,0 +1,18 @@
+10  let lo = 2
+20  let hi = 10
+30  let i = lo
+40  while i < hi
+50    let j = 2
+60    let f = 0
+70    until j * 2 > i | flag
+80      if i % j = 0
+90        let flag = 1
+100     end
+105   let j = j + 1
+110   end
+120   if flag = 0
+130     print i
+140   end
+145   let i = i + 1
+150 end
+160 stop

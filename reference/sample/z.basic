@@ -1,0 +1,19 @@
+      LET x = 10
+      LET y = 15
+      IF 0
+      GOTO 10
+      END
+      LET z = (((x + y) - (z * 2)) + ((3 / 4) * 3276))
+      PRINT z
+      IF z
+      LET b = 215
+      IF b
+      GOTO 10
+      END
+      STOP
+      END
+10    FOR i IN 1 TO 5
+      PRINT i
+      END
+      STOP
+      RUN
